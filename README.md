@@ -1,16 +1,29 @@
-# React + Vite
+# 🎙️ NuancePad: Privacy-First AI Meetings
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+NuancePad is a 100% browser-based meeting assistant. Unlike other AI note-takers, NuancePad runs the transcription engine (**Whisper**) locally in your browser using WebAssembly. Your audio never leaves your computer.
 
-Currently, two official plugins are available:
+### ✨ Key Features
+* **Local Transcription:** Uses `whisper-tiny.en`—no cloud audio processing.
+* **AI Executive Summary:** Uses Gemini 2.0 Flash to turn messy transcripts into structured notes.
+* **Magic Templates:** Generate custom extraction prompts (e.g., "Find the budget" or "List action items") on the fly.
+* **Zero Cost:** Built using free-tier APIs and local models.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+### 🎧 Recording System Audio (Teams/Zoom/Webex)
+To transcribe meetings from desktop apps on a Mac, you need to route the audio into the browser using a virtual bridge. 
 
-## React Compiler
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-## Expanding the ESLint configuration
+1. **Install BlackHole:** Download [BlackHole 2ch](https://github.com/ExistentialAudio/BlackHole).
+2. **Multi-Output Device:** In Audio MIDI Setup, create a Multi-Output device including your Speakers + BlackHole.
+3. **Aggregate Device:** Create an Aggregate Device including your Mic + BlackHole.
+4. **Settings:** Set your meeting app to output to the **Multi-Output Device** and NuancePad's microphone to the **Aggregate Device**.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+---
+
+## 🚀 Quick Start
+For a detailed technical setup, see [INSTALL.md](./INSTALL.md).
+
+1. Clone the repo: `git clone https://github.com/bhrpraju/nuancepad.git`
+2. Install: `npm install`
+3. Add your keys to `.env.local` (Gemini & Firebase).
+4. Run: `npm run dev`
