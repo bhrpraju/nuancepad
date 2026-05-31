@@ -13,9 +13,10 @@ vi.mock("../services/emailService", () => ({
   }
 }));
 
-const meeting: Pick<MeetingDocument, "title" | "meetingDate" | "clientProject" | "platform" | "reportJson"> = {
+const meeting: Pick<MeetingDocument, "title" | "meetingDate" | "meetingType" | "clientProject" | "platform" | "reportJson"> = {
   title: "Weekly Review",
   meetingDate: "2026-05-31",
+  meetingType: "Status Review",
   clientProject: "Internal",
   platform: "Webex",
   reportJson: {
@@ -51,18 +52,24 @@ describe("ExportActions", () => {
     expect(screen.getByRole("button", { name: "Send Follow-up Email" })).toBeInTheDocument();
   });
 
-  it("sends selected email type with recipients", async () => {
+  it.each([
+    { label: "Send Full MoM", emailType: "full_mom" },
+    { label: "Send Action Items", emailType: "action_items" },
+    { label: "Send Decisions", emailType: "decisions" },
+    { label: "Send Risks & Concerns", emailType: "risks_and_concerns" },
+    { label: "Send Follow-up Email", emailType: "follow_up_email" }
+  ])("sends selected email type for %s", async ({ label, emailType }) => {
     mocks.sendMeetingEmail.mockResolvedValue(undefined);
     render(<ExportActions meeting={meeting} />);
 
     fireEvent.change(screen.getByLabelText("Recipients"), { target: { value: "a@x.com,b@y.com" } });
-    fireEvent.click(screen.getByRole("button", { name: "Send Action Items" }));
+    fireEvent.click(screen.getByRole("button", { name: label }));
 
     await waitFor(() => {
       expect(mocks.sendMeetingEmail).toHaveBeenCalledWith(
         expect.objectContaining({
           to: "a@x.com,b@y.com",
-          emailType: "action_items"
+          emailType
         })
       );
       expect(screen.getByText("Email sent successfully.")).toBeInTheDocument();

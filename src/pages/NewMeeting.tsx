@@ -332,6 +332,7 @@ export function NewMeeting() {
           meeting={{
             title: metadata.title,
             meetingDate: metadata.meetingDate,
+            meetingType: metadata.meetingType,
             clientProject: metadata.clientProject,
             platform: metadata.platform,
             reportJson: report

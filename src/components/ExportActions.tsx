@@ -3,7 +3,7 @@ import type { MeetingDocument } from "../domain/meeting";
 import { emailService, type MeetingEmailType } from "../services/emailService";
 
 interface ExportActionsProps {
-  meeting: Pick<MeetingDocument, "title" | "meetingDate" | "clientProject" | "platform" | "reportJson">;
+  meeting: Pick<MeetingDocument, "title" | "meetingDate" | "meetingType" | "clientProject" | "platform" | "reportJson">;
 }
 
 const tableRows = (rows: string[][]) => rows.map((row) => `| ${row.join(" | ")} |`).join("\n");
@@ -50,29 +50,64 @@ ${report.followUpEmail}
 `;
 };
 
-const toEmailBody = (meeting: ExportActionsProps["meeting"]) => {
+const toFullMomPlainText = (meeting: ExportActionsProps["meeting"]) => {
   const report = meeting.reportJson;
+  const discussionLines = report.keyDiscussionPoints.length
+    ? report.keyDiscussionPoints.map((item, index) => `${index + 1}. ${item.topic}: ${item.summary}`).join("\n")
+    : "No key discussion points were captured for this meeting.";
+
+  const decisionLines = report.decisions.length
+    ? report.decisions.map((item, index) => `${index + 1}. ${item.decision} | Owner: ${item.owner} | Impact: ${item.impact} | Effective: ${item.effectiveDate}`).join("\n")
+    : "No decisions were captured for this meeting.";
+
   const actionLines = report.actionItems.length
-    ? report.actionItems.map((item, index) => `${index + 1}. ${item.task} | Owner: ${item.owner} | Due: ${item.dueDate} | ${item.status}`).join("\n")
-    : "No action items captured.";
+    ? report.actionItems.map((item, index) => `${index + 1}. ${item.task} | Owner: ${item.owner} | Due: ${item.dueDate} | Priority: ${item.priority} | Status: ${item.status}`).join("\n")
+    : "No action items were captured for this meeting.";
 
-  return `Hi team,
+  const riskLines = report.risks.length
+    ? report.risks.map((item, index) => `${index + 1}. ${item.risk} | Severity: ${item.severity} | Owner: ${item.owner} | Mitigation: ${item.mitigation} | Target: ${item.targetDate}`).join("\n")
+    : "No risks were captured for this meeting.";
 
-Please find minutes of meeting for ${meeting.title} (${meeting.meetingDate}).
+  const concernLines = report.stakeholderConcerns.length
+    ? report.stakeholderConcerns
+        .map((item, index) => `${index + 1}. ${item.stakeholder} | Concern: ${item.concern} | Required Response: ${item.requiredResponse} | Owner: ${item.owner} | Due: ${item.dueDate}`)
+        .join("\n")
+    : "No stakeholder concerns were captured for this meeting.";
+
+  const additionalLines = report.additionalDiscussedItems.length
+    ? report.additionalDiscussedItems.map((item, index) => `${index + 1}. ${item.item} | Notes: ${item.notes} | Follow-up Needed: ${item.followUpNeeded}`).join("\n")
+    : "No additional discussed items were captured for this meeting.";
+
+  return `Minutes of Meeting: ${meeting.title}
+Date: ${meeting.meetingDate}
+Type: ${meeting.meetingType}
+Client/Project: ${meeting.clientProject}
+Platform: ${meeting.platform}
 
 Executive summary:
 ${report.executiveSummary}
 
-Decisions:
-${report.decisions.length ? report.decisions.map((item, index) => `${index + 1}. ${item.decision} (Owner: ${item.owner})`).join("\n") : "No decisions captured."}
+Key discussion points:
+${discussionLines}
 
-Action items:
+Decisions
+${decisionLines}
+
+Action items
 ${actionLines}
 
-Follow-up draft:
-${report.followUpEmail}
+Risks
+${riskLines}
 
-Regards,`;
+Stakeholder concerns
+${concernLines}
+
+Additional discussed items
+${additionalLines}
+
+Follow-up email draft
+${report.followUpEmail}
+`;
 };
 
 const copy = async (text: string) => navigator.clipboard.writeText(text);
@@ -83,8 +118,8 @@ export function ExportActions({ meeting }: ExportActionsProps) {
   const [sendStatus, setSendStatus] = useState("");
   const [sendError, setSendError] = useState("");
   const markdown = toMarkdown(meeting);
-  const emailSubject = useMemo(() => `MoM: ${meeting.title} (${meeting.meetingDate})`, [meeting.meetingDate, meeting.title]);
-  const emailBody = useMemo(() => toEmailBody(meeting), [meeting]);
+  const emailSubject = useMemo(() => `MoM: ${meeting.title}`, [meeting.title]);
+  const emailBody = useMemo(() => toFullMomPlainText(meeting), [meeting]);
   const emailHref = useMemo(
     () => `mailto:${encodeURIComponent(emailTo.trim())}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`,
     [emailBody, emailSubject, emailTo]
@@ -157,7 +192,7 @@ export function ExportActions({ meeting }: ExportActionsProps) {
           id="recipients-input"
           type="text"
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-          placeholder="name@company.com, team@company.com"
+          placeholder="[name@company.com](mailto:name@company.com), [team@company.com](mailto:team@company.com)"
           value={emailTo}
           onChange={(e) => {
             setEmailTo(e.target.value);

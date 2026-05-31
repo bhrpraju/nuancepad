@@ -30,6 +30,7 @@ export function MeetingDetail() {
         meeting={{
           title: meeting.title,
           meetingDate: meeting.meetingDate,
+          meetingType: meeting.meetingType,
           clientProject: meeting.clientProject,
           platform: meeting.platform,
           reportJson: meeting.reportJson

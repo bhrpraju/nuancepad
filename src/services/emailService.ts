@@ -10,7 +10,7 @@ export type MeetingEmailType =
 interface SendMeetingEmailPayload {
   to: string;
   emailType: MeetingEmailType;
-  meeting: Pick<MeetingDocument, "title" | "meetingDate" | "clientProject" | "platform" | "reportJson">;
+  meeting: Pick<MeetingDocument, "title" | "meetingDate" | "meetingType" | "clientProject" | "platform" | "reportJson">;
 }
 
 export const emailService = {
