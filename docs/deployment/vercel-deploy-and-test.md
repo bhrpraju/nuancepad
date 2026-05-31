@@ -80,7 +80,8 @@ VITE_FIREBASE_APP_ID=
 
 ```bash
 GEMINI_API_KEY=
-GEMINI_MODEL=gemini-1.5-flash
+GEMINI_MODEL=gemini-flash-latest
+GEMINI_FALLBACK_MODEL=gemini-2.0-flash
 ```
 
 Apply to:
@@ -92,6 +93,7 @@ Important:
 
 1. Do not use `VITE_` prefix for backend secrets.
 2. `GEMINI_API_KEY` must remain server-side only.
+3. `GEMINI_FALLBACK_MODEL` is optional but recommended to reduce outage impact during model saturation.
 
 ## 8. Deploy
 

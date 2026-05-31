@@ -38,8 +38,9 @@ VITE_FIREBASE_PROJECT_ID=
 VITE_FIREBASE_STORAGE_BUCKET=
 VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=
-VITE_GEMINI_API_KEY=
-VITE_GEMINI_MODEL=gemini-1.5-flash
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-flash-latest
+GEMINI_FALLBACK_MODEL=gemini-2.0-flash
 ```
 
 If Firebase vars are missing, app runs in local-storage mode.
@@ -56,7 +57,8 @@ Set backend env vars in Vercel:
 
 ```bash
 GEMINI_API_KEY=
-GEMINI_MODEL=gemini-1.5-flash
+GEMINI_MODEL=gemini-flash-latest
+GEMINI_FALLBACK_MODEL=gemini-2.0-flash
 ```
 
 For local full-stack testing, use:
