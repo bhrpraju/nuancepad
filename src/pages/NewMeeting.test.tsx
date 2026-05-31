@@ -6,6 +6,7 @@ import { NewMeeting } from "./NewMeeting";
 const mocks = vi.hoisted(() => ({
   generateMeetingReport: vi.fn(),
   createMeeting: vi.fn(),
+  createMeetingWithStatus: vi.fn(),
   transcribeRecording: vi.fn(),
   importAuthorizedLink: vi.fn()
 }));
@@ -18,7 +19,8 @@ vi.mock("../services/aiReportService", () => ({
 
 vi.mock("../services/meetingService", () => ({
   meetingService: {
-    create: mocks.createMeeting
+    create: mocks.createMeeting,
+    createWithStatus: mocks.createMeetingWithStatus
   }
 }));
 
@@ -38,6 +40,7 @@ describe("NewMeeting", () => {
   beforeEach(() => {
     mocks.generateMeetingReport.mockReset();
     mocks.createMeeting.mockReset();
+    mocks.createMeetingWithStatus.mockReset();
     mocks.transcribeRecording.mockReset();
     mocks.importAuthorizedLink.mockReset();
   });
@@ -153,6 +156,107 @@ describe("NewMeeting", () => {
     await waitFor(() => {
       expect(mocks.importAuthorizedLink).toHaveBeenCalledTimes(1);
       expect(screen.getByText(/passcode must be entered inside webex playback page/i)).toBeInTheDocument();
+    });
+  });
+
+  it("shows saving and success states and sends usage metrics payload on save", async () => {
+    mocks.generateMeetingReport.mockResolvedValue({
+      report: {
+        title: "Weekly Review",
+        attendees: [],
+        executiveSummary: "Summary",
+        keyDiscussionPoints: [{ topic: "Scope", summary: "Discussed scope" }],
+        decisions: [{ decision: "Move ahead", owner: "Unassigned", impact: "Schedule", effectiveDate: "Not specified" }],
+        actionItems: [{ task: "Share plan", owner: "Unassigned", dueDate: "Not specified", priority: "High", status: "Open" }],
+        risks: [{ risk: "Delay", severity: "Medium", owner: "Unassigned", mitigation: "Track", targetDate: "Not specified" }],
+        openQuestions: [],
+        stakeholderConcerns: [],
+        additionalDiscussedItems: [],
+        followUpEmail: "Draft",
+        tags: []
+      },
+      usage: { promptTokens: 11, outputTokens: 22, totalTokens: 33 }
+    });
+
+    let resolveSave: ((value: { id: string; storage: "local" | "firebase"; fallbackUsed: boolean }) => void) | undefined;
+    const savePromise = new Promise<{ id: string; storage: "local" | "firebase"; fallbackUsed: boolean }>((resolve) => {
+      resolveSave = resolve;
+    });
+    mocks.createMeetingWithStatus.mockReturnValue(savePromise);
+
+    render(
+      <MemoryRouter>
+        <NewMeeting />
+      </MemoryRouter>
+    );
+
+    fireEvent.change(screen.getByLabelText("Meeting title"), { target: { value: "Weekly Review" } });
+    fireEvent.change(screen.getByPlaceholderText("Paste transcript here"), { target: { value: "Team discussed timeline and tasks." } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate MoM" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Save meeting" })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save meeting" }));
+    expect(screen.getByRole("button", { name: "Saving..." })).toBeDisabled();
+
+    resolveSave?.({ id: "meeting-1", storage: "firebase", fallbackUsed: false });
+
+    await waitFor(() => {
+      expect(mocks.createMeetingWithStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Weekly Review",
+          usageMetrics: expect.objectContaining({
+            promptTokens: 11,
+            outputTokens: 22,
+            totalTokens: 33
+          })
+        })
+      );
+      expect(screen.getByText("Meeting saved successfully.")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "View saved meeting" })).toBeInTheDocument();
+    });
+  });
+
+  it("shows friendly save failure message", async () => {
+    mocks.generateMeetingReport.mockResolvedValue({
+      report: {
+        title: "Weekly Review",
+        attendees: [],
+        executiveSummary: "Summary",
+        keyDiscussionPoints: [{ topic: "Scope", summary: "Discussed scope" }],
+        decisions: [],
+        actionItems: [],
+        risks: [],
+        openQuestions: [],
+        stakeholderConcerns: [],
+        additionalDiscussedItems: [],
+        followUpEmail: "Draft",
+        tags: []
+      },
+      usage: { promptTokens: 1, outputTokens: 1, totalTokens: 2 }
+    });
+    mocks.createMeetingWithStatus.mockRejectedValue(new Error("Permission denied"));
+
+    render(
+      <MemoryRouter>
+        <NewMeeting />
+      </MemoryRouter>
+    );
+
+    fireEvent.change(screen.getByLabelText("Meeting title"), { target: { value: "Weekly Review" } });
+    fireEvent.change(screen.getByPlaceholderText("Paste transcript here"), { target: { value: "Team discussed timeline." } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate MoM" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Save meeting" })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save meeting" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Save failed: Permission denied")).toBeInTheDocument();
     });
   });
 });

@@ -38,8 +38,12 @@ export function NewMeeting() {
   const [usageMetrics, setUsageMetrics] = useState<UsageMetrics | null>(null);
   const [report, setReport] = useState<MeetingReport | null>(null);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+  const [saveMessage, setSaveMessage] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [savedMeetingId, setSavedMeetingId] = useState("");
 
   const toFriendlyImportError = (message: string): string => {
     if (!message.startsWith("manual_upload_required:")) {
@@ -79,6 +83,9 @@ export function NewMeeting() {
     setLoading(true);
     setError("");
     setStatusMessage("");
+    setSaveMessage("");
+    setSaveError("");
+    setSavedMeetingId("");
     setUsageMetrics(null);
 
     try {
@@ -145,18 +152,36 @@ export function NewMeeting() {
     if (!report) {
       return;
     }
+    setSaving(true);
+    setSaveError("");
+    setSaveMessage("Saving...");
 
-    const id = await meetingService.create({
-      ...metadata,
-      sourceType: generatedSourceType,
-      recordingUrl: generatedSourceType === "recording_link" ? recordingUrl.trim() : undefined,
-      importStatus: "completed",
-      rawTranscript: preparedTranscript || transcript,
-      usageMetrics: usageMetrics ?? undefined,
-      reportJson: report
-    });
+    try {
+      const result = await meetingService.createWithStatus({
+        ...metadata,
+        sourceType: generatedSourceType,
+        recordingUrl: generatedSourceType === "recording_link" ? recordingUrl.trim() : undefined,
+        importStatus: "completed",
+        rawTranscript: preparedTranscript || transcript,
+        usageMetrics: usageMetrics ?? undefined,
+        reportJson: report
+      });
 
-    navigate(`/meetings/${id}`);
+      setSavedMeetingId(result.id);
+      if (result.storage === "firebase" && !result.fallbackUsed) {
+        setSaveMessage("Meeting saved successfully.");
+      } else if (result.fallbackUsed) {
+        setSaveMessage("Meeting saved successfully using local browser storage.");
+      } else {
+        setSaveMessage("Meeting saved successfully.");
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown save error.";
+      setSaveMessage("");
+      setSaveError(`Save failed: ${message}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -318,14 +343,30 @@ export function NewMeeting() {
           {loading ? "Processing..." : "Generate MoM"}
         </button>
         {report && (
-          <button type="button" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm" onClick={onSave}>
-            Save meeting
+          <button
+            type="button"
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm disabled:opacity-50"
+            onClick={onSave}
+            disabled={saving}
+          >
+            {saving ? "Saving..." : "Save meeting"}
+          </button>
+        )}
+        {savedMeetingId && !saving && (
+          <button
+            type="button"
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm"
+            onClick={() => navigate(`/meetings/${savedMeetingId}`)}
+          >
+            View saved meeting
           </button>
         )}
       </div>
 
       {statusMessage && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{statusMessage}</div>}
       {error && <div className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm text-rose-900">{error}</div>}
+      {saveMessage && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{saveMessage}</div>}
+      {saveError && <div className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm text-rose-900">{saveError}</div>}
 
       {report && (
         <ExportActions
