@@ -6,7 +6,8 @@ import { NewMeeting } from "./NewMeeting";
 const mocks = vi.hoisted(() => ({
   generateMeetingReport: vi.fn(),
   createMeeting: vi.fn(),
-  transcribeRecording: vi.fn()
+  transcribeRecording: vi.fn(),
+  importAuthorizedLink: vi.fn()
 }));
 
 vi.mock("../services/aiReportService", () => ({
@@ -27,11 +28,18 @@ vi.mock("../services/transcriptionService", () => ({
   }
 }));
 
+vi.mock("../services/linkImportService", () => ({
+  linkImportService: {
+    importAuthorizedLink: mocks.importAuthorizedLink
+  }
+}));
+
 describe("NewMeeting", () => {
   beforeEach(() => {
     mocks.generateMeetingReport.mockReset();
     mocks.createMeeting.mockReset();
     mocks.transcribeRecording.mockReset();
+    mocks.importAuthorizedLink.mockReset();
   });
 
   it("disables generation without required data", () => {
@@ -121,6 +129,31 @@ describe("NewMeeting", () => {
         "Transcript from recording",
         expect.objectContaining({ sourceType: "recording_file" })
       );
+    });
+  });
+
+  it("shows manual fallback error when authorized link import is blocked", async () => {
+    mocks.importAuthorizedLink.mockResolvedValue({
+      status: "manual_upload_required",
+      reason: "passcode_entry_required",
+      details: "Provider requires passcode entry in hosted player."
+    });
+
+    render(
+      <MemoryRouter>
+        <NewMeeting />
+      </MemoryRouter>
+    );
+
+    fireEvent.change(screen.getByLabelText("Meeting title"), { target: { value: "Webex review" } });
+    fireEvent.click(screen.getByRole("button", { name: "Recording upload (advanced)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Authorized link import (Webex)" }));
+    fireEvent.change(screen.getByPlaceholderText("https://...webex.com/..."), { target: { value: "https://example.webex.com/replay" } });
+    fireEvent.click(screen.getByRole("button", { name: "Transcribe & Generate MoM" }));
+
+    await waitFor(() => {
+      expect(mocks.importAuthorizedLink).toHaveBeenCalledTimes(1);
+      expect(screen.getByText(/manual_upload_required/i)).toBeInTheDocument();
     });
   });
 });

@@ -17,6 +17,12 @@ NuancePad is a corporate-safe meeting intelligence app.
 - Same persistence/history/export pipeline as transcript mode
 - Explicit processing and error messages for transcription/generation steps
 
+## Milestone C included
+
+- Authorized Webex link intake (`recording link + passcode` fields)
+- Safe direct transcript-link import attempt (no bypass behavior)
+- Explicit `manual_upload_required` fallback when provider interaction/controls are required
+
 ## Compliance boundary
 
 NuancePad only processes authorized content and does not bypass SSO, CAPTCHA, DRM, disabled downloads, passcodes, or company access controls.

@@ -1,7 +1,7 @@
 # NuancePad Full-Stack Vercel Deploy And Test Guide
 
 Date: May 31, 2026  
-Scope: Milestone A + Milestone B (frontend + backend)
+Scope: Milestone A + Milestone B + Milestone C (frontend + backend)
 
 ## 1. What Gets Deployed
 
@@ -11,6 +11,7 @@ This deployment is full-stack in one Vercel project:
 2. Backend API routes:
    - `POST /api/generate-report`
    - `POST /api/transcribe-recording`
+   - `POST /api/import-recording-link`
 
 ## 2. Prerequisites
 
@@ -44,7 +45,7 @@ Use Vercel runtime locally so `/api/*` works:
 vercel dev
 ```
 
-Then open the local URL shown by Vercel and test both transcript and recording flows.
+Then open the local URL shown by Vercel and test transcript, recording upload, and Webex link import flows.
 
 ## 5. Push Code To GitHub
 
@@ -135,11 +136,21 @@ Important:
 3. `Copy follow-up email`
 4. `Export markdown`
 
+### E. Webex Link Flow (Milestone C)
+
+1. Switch to `Recording upload (advanced)`
+2. Select `Authorized link import (Webex)`
+3. Paste a Webex recording link and passcode (if provided)
+4. Click `Transcribe & Generate MoM`
+5. Expected result (success path): transcript imported and MoM generated
+6. Expected result (blocked path): error contains `manual_upload_required` with recovery instruction
+
 ## 10. Negative Tests
 
 1. Upload unsupported file (e.g. `.mov`) -> validation error expected
 2. Remove `GEMINI_API_KEY` in Preview env and redeploy -> `AI provider not configured.` expected
 3. Remove Firebase vars -> app still functions using local-storage mode
+4. Use a Webex link requiring interactive sign-in/passcode page -> `manual_upload_required` expected
 
 ## 11. Go / No-Go Checklist
 
@@ -148,9 +159,10 @@ Go live only if all are true:
 1. Deployment `Ready`
 2. Transcript flow works end-to-end
 3. Recording flow works end-to-end
-4. Save/history/detail works
-5. Exports work
-6. No blocking runtime errors in browser console or Vercel function logs
+4. Webex link flow returns either success or explicit `manual_upload_required`
+5. Save/history/detail works
+6. Exports work
+7. No blocking runtime errors in browser console or Vercel function logs
 
 ## 12. Next Hardening Step
 

@@ -8,6 +8,7 @@ import { TranscriptInputCard } from "../components/TranscriptInputCard";
 import type { MeetingMetadata, MeetingReport, SourceType, UsageMetrics } from "../domain/meeting";
 import { aiReportService } from "../services/aiReportService";
 import { meetingService } from "../services/meetingService";
+import { linkImportService } from "../services/linkImportService";
 import { transcriptionService } from "../services/transcriptionService";
 import { defaultMeetingReport } from "../utils/meetingSchema";
 import { parseTranscriptByFileName } from "../utils/transcriptParsers";
@@ -27,7 +28,10 @@ export function NewMeeting() {
   const [transcript, setTranscript] = useState("");
   const [transcriptSource, setTranscriptSource] = useState<"paste" | "file">("paste");
   const [inputMode, setInputMode] = useState<"transcript" | "recording">("transcript");
+  const [recordingIntakeMode, setRecordingIntakeMode] = useState<"file" | "link">("file");
   const [recordingFile, setRecordingFile] = useState<File | null>(null);
+  const [recordingUrl, setRecordingUrl] = useState("");
+  const [recordingPasscode, setRecordingPasscode] = useState("");
   const [preparedTranscript, setPreparedTranscript] = useState("");
   const [generatedSourceType, setGeneratedSourceType] = useState<SourceType>("transcript_paste");
   const [usageMetrics, setUsageMetrics] = useState<UsageMetrics | null>(null);
@@ -38,10 +42,10 @@ export function NewMeeting() {
 
   const sourceType = useMemo<SourceType>(() => {
     if (inputMode === "recording") {
-      return "recording_file";
+      return recordingIntakeMode === "link" ? "recording_link" : "recording_file";
     }
     return transcriptSource === "file" ? "transcript_file" : "transcript_paste";
-  }, [inputMode, transcriptSource]);
+  }, [inputMode, recordingIntakeMode, transcriptSource]);
 
   const onGenerate = async () => {
     setLoading(true);
@@ -54,14 +58,34 @@ export function NewMeeting() {
       let transcriptionTokens = 0;
 
       if (inputMode === "recording") {
-        if (!recordingFile) {
-          throw new Error("Upload a recording file before generating.");
+        if (recordingIntakeMode === "file") {
+          if (!recordingFile) {
+            throw new Error("Upload a recording file before generating.");
+          }
+          setStatusMessage("Transcribing recording...");
+          const transcriptionResult = await transcriptionService.transcribeRecording(recordingFile);
+          workingTranscript = transcriptionResult.transcript;
+          transcriptionTokens = transcriptionResult.usage.totalTokens;
+          setTranscript(workingTranscript);
+        } else {
+          if (!recordingUrl.trim()) {
+            throw new Error("Enter a recording link before generating.");
+          }
+
+          setStatusMessage("Attempting authorized Webex link import...");
+          const linkResult = await linkImportService.importAuthorizedLink({
+            platform: metadata.platform,
+            recordingUrl: recordingUrl.trim(),
+            passcode: recordingPasscode.trim()
+          });
+
+          if (linkResult.status === "manual_upload_required") {
+            throw new Error(`manual_upload_required: ${linkResult.reason}. ${linkResult.details}`);
+          }
+
+          workingTranscript = linkResult.transcript;
+          setTranscript(workingTranscript);
         }
-        setStatusMessage("Transcribing recording...");
-        const transcriptionResult = await transcriptionService.transcribeRecording(recordingFile);
-        workingTranscript = transcriptionResult.transcript;
-        transcriptionTokens = transcriptionResult.usage.totalTokens;
-        setTranscript(workingTranscript);
       }
 
       if (!workingTranscript) {
@@ -96,6 +120,7 @@ export function NewMeeting() {
     const id = await meetingService.create({
       ...metadata,
       sourceType: generatedSourceType,
+      recordingUrl: generatedSourceType === "recording_link" ? recordingUrl.trim() : undefined,
       importStatus: "completed",
       rawTranscript: preparedTranscript || transcript,
       usageMetrics: usageMetrics ?? undefined,
@@ -151,22 +176,91 @@ export function NewMeeting() {
           }}
         />
       ) : (
-        <RecordingInputCard
-          file={recordingFile}
-          onFileChange={(file) => {
-            setRecordingFile(file);
-            setReport(null);
-            setPreparedTranscript("");
-            setUsageMetrics(null);
-          }}
-        />
+        <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <h3 className="font-semibold">Recording Intake (advanced)</h3>
+          <p className="text-sm text-slate-600">
+            Use file upload for the fastest path. Use authorized Webex link import only when you have access and passcode details.
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setRecordingIntakeMode("file")}
+              className={`rounded-lg px-3 py-2 text-sm ${recordingIntakeMode === "file" ? "bg-slate-900 text-white" : "border border-slate-300 bg-white"}`}
+            >
+              Upload file
+            </button>
+            <button
+              type="button"
+              onClick={() => setRecordingIntakeMode("link")}
+              className={`rounded-lg px-3 py-2 text-sm ${recordingIntakeMode === "link" ? "bg-slate-900 text-white" : "border border-slate-300 bg-white"}`}
+            >
+              Authorized link import (Webex)
+            </button>
+          </div>
+
+          {recordingIntakeMode === "file" ? (
+            <RecordingInputCard
+              file={recordingFile}
+              onFileChange={(file) => {
+                setRecordingFile(file);
+                setGeneratedSourceType("recording_file");
+                setReport(null);
+                setPreparedTranscript("");
+                setUsageMetrics(null);
+              }}
+            />
+          ) : (
+            <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
+              <label className="text-sm">
+                <span className="mb-1 block font-medium">Webex recording link</span>
+                <input
+                  className="w-full rounded border p-2"
+                  placeholder="https://...webex.com/..."
+                  value={recordingUrl}
+                  onChange={(e) => {
+                    setRecordingUrl(e.target.value);
+                    setGeneratedSourceType("recording_link");
+                    setReport(null);
+                    setPreparedTranscript("");
+                    setUsageMetrics(null);
+                  }}
+                />
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block font-medium">Passcode (if provided)</span>
+                <input
+                  className="w-full rounded border p-2"
+                  placeholder="Enter passcode from share email"
+                  value={recordingPasscode}
+                  onChange={(e) => {
+                    setRecordingPasscode(e.target.value);
+                  }}
+                />
+              </label>
+              <p className="text-xs text-slate-500">
+                If the provider page requires interactive sign-in/passcode/CAPTCHA, NuancePad will return
+                <code className="mx-1">manual_upload_required</code>
+                and ask for manual transcript/recording upload.
+              </p>
+            </div>
+          )}
+        </section>
       )}
 
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
           className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white disabled:opacity-50"
-          disabled={(inputMode === "transcript" ? !transcript.trim() : !recordingFile) || !metadata.title || loading}
+          disabled={
+            (inputMode === "transcript"
+              ? !transcript.trim()
+              : recordingIntakeMode === "file"
+                ? !recordingFile
+                : !recordingUrl.trim()) ||
+            !metadata.title ||
+            loading
+          }
           onClick={onGenerate}
         >
           {loading ? "Processing..." : inputMode === "recording" ? "Transcribe & Generate MoM" : "Generate MoM"}
