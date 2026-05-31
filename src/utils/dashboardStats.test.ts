@@ -44,9 +44,14 @@ describe("buildDashboardStats", () => {
 
     expect(stats.totalMeetings).toBe(3);
     expect(stats.meetingsThisWeek).toBe(2);
+    expect(stats.meetingsPreviousWeek).toBe(0);
     expect(stats.meetingsThisMonth).toBe(2);
+    expect(stats.meetingsPreviousMonth).toBe(1);
     expect(stats.openActionItems).toBe(3);
+    expect(stats.completionRate).toBe(0);
     expect(stats.highRisks).toBe(3);
     expect(stats.topPlatforms[0].name).toBe("Webex");
+    expect(stats.weeklySeries).toHaveLength(8);
+    expect(stats.monthlySeries).toHaveLength(6);
   });
 });
