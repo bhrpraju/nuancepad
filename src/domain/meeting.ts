@@ -67,6 +67,13 @@ export interface MeetingMetadata {
   sourceType: SourceType;
 }
 
+export interface UsageMetrics {
+  promptTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  transcriptWordCount: number;
+}
+
 export type ImportStatus =
   | "draft"
   | "queued"
@@ -81,6 +88,7 @@ export interface MeetingDocument extends MeetingMetadata {
   importStatus: ImportStatus;
   manualFallbackReason?: string;
   rawTranscript: string;
+  usageMetrics?: UsageMetrics;
   reportJson: MeetingReport;
   createdAt: string;
   updatedAt: string;

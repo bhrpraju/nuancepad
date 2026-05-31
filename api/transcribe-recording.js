@@ -13,6 +13,13 @@ function text(res, status, message) {
   res.end(message);
 }
 
+function normalizeUsage(usage) {
+  const promptTokens = Number(usage?.promptTokenCount || 0);
+  const outputTokens = Number(usage?.candidatesTokenCount || 0);
+  const totalTokens = Number(usage?.totalTokenCount || promptTokens + outputTokens);
+  return { promptTokens, outputTokens, totalTokens };
+}
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function callGeminiWithRetry({ model, apiKey, body }) {
@@ -114,7 +121,10 @@ export default async function handler(req, res) {
       return;
     }
 
-    json(res, 200, { transcript: String(transcript).trim() });
+    json(res, 200, {
+      transcript: String(transcript).trim(),
+      usage: normalizeUsage(winner.payload?.usageMetadata)
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected server error.";
     text(res, 500, `Backend error: ${message}`);

@@ -20,6 +20,13 @@ function stripCodeFences(value) {
     .trim();
 }
 
+function normalizeUsage(usage) {
+  const promptTokens = Number(usage?.promptTokenCount || 0);
+  const outputTokens = Number(usage?.candidatesTokenCount || 0);
+  const totalTokens = Number(usage?.totalTokenCount || promptTokens + outputTokens);
+  return { promptTokens, outputTokens, totalTokens };
+}
+
 function buildPrompt(transcript, metadata) {
   return `
 You are NuancePad AI.
@@ -146,7 +153,10 @@ export default async function handler(req, res) {
     }
 
     try {
-      json(res, 200, JSON.parse(stripCodeFences(textResult)));
+      json(res, 200, {
+        report: JSON.parse(stripCodeFences(textResult)),
+        usage: normalizeUsage(winner.payload?.usageMetadata)
+      });
     } catch {
       text(res, 502, "AI provider returned invalid JSON.");
     }

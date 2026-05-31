@@ -1,8 +1,13 @@
-import type { MeetingMetadata, MeetingReport } from "../domain/meeting";
+import type { MeetingMetadata, MeetingReport, UsageMetrics } from "../domain/meeting";
 import { normalizeMeetingReport } from "../utils/meetingSchema";
 
+export interface ReportGenerationResult {
+  report: MeetingReport;
+  usage: Pick<UsageMetrics, "promptTokens" | "outputTokens" | "totalTokens">;
+}
+
 export const aiReportService = {
-  async generateMeetingReport(transcript: string, metadata: MeetingMetadata): Promise<MeetingReport> {
+  async generateMeetingReport(transcript: string, metadata: MeetingMetadata): Promise<ReportGenerationResult> {
     const response = await fetch("/api/generate-report", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -14,7 +19,19 @@ export const aiReportService = {
       throw new Error(text || "Failed to generate meeting report.");
     }
 
-    const parsed = (await response.json()) as Partial<MeetingReport>;
-    return normalizeMeetingReport({ ...parsed, title: parsed.title || metadata.title });
+    const parsed = (await response.json()) as unknown;
+    const wrapped = parsed && typeof parsed === "object" && ("report" in parsed || "usage" in parsed);
+    const wrapper = wrapped ? (parsed as { report?: Partial<MeetingReport>; usage?: Partial<UsageMetrics> }) : null;
+    const reportPayload = wrapper?.report ?? ((parsed as Partial<MeetingReport>) || {});
+    const usagePayload = wrapper?.usage ?? {};
+
+    return {
+      report: normalizeMeetingReport({ ...reportPayload, title: reportPayload.title || metadata.title }),
+      usage: {
+        promptTokens: Number(usagePayload.promptTokens || 0),
+        outputTokens: Number(usagePayload.outputTokens || 0),
+        totalTokens: Number(usagePayload.totalTokens || 0)
+      }
+    };
   }
 };

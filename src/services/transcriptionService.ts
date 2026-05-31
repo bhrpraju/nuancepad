@@ -1,6 +1,15 @@
 const MAX_RECORDING_SIZE_BYTES = 25 * 1024 * 1024;
 export const SUPPORTED_RECORDING_EXTENSIONS = ["mp3", "wav", "m4a", "mp4", "webm"] as const;
 
+export interface TranscriptionResult {
+  transcript: string;
+  usage: {
+    promptTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+  };
+}
+
 export const isSupportedRecordingFileName = (name: string): boolean => {
   const lower = name.toLowerCase();
   return SUPPORTED_RECORDING_EXTENSIONS.some((ext) => lower.endsWith(`.${ext}`));
@@ -40,7 +49,7 @@ const toBase64 = (buffer: ArrayBuffer): string => {
 };
 
 export const transcriptionService = {
-  async transcribeRecording(file: File): Promise<string> {
+  async transcribeRecording(file: File): Promise<TranscriptionResult> {
     const mimeType = validateRecordingFile(file);
     const response = await fetch("/api/transcribe-recording", {
       method: "POST",
@@ -59,13 +68,20 @@ export const transcriptionService = {
       throw new Error(text || "Failed to transcribe recording.");
     }
 
-    const body = await response.json();
+    const body = (await response.json()) as { transcript?: string; usage?: Record<string, unknown> };
     const text = body?.transcript;
 
     if (!text || !text.trim()) {
       throw new Error("Transcription provider returned empty transcript.");
     }
 
-    return text.trim();
+    return {
+      transcript: text.trim(),
+      usage: {
+        promptTokens: Number(body?.usage?.promptTokens || 0),
+        outputTokens: Number(body?.usage?.outputTokens || 0),
+        totalTokens: Number(body?.usage?.totalTokens || 0)
+      }
+    };
   }
 };

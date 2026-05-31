@@ -27,31 +27,46 @@ const baseMeeting = (overrides: Partial<MeetingDocument>): MeetingDocument => ({
     followUpEmail: "",
     tags: []
   },
+  usageMetrics: {
+    promptTokens: 10,
+    outputTokens: 20,
+    totalTokens: 30,
+    transcriptWordCount: 120
+  },
   createdAt: "2026-05-31T10:00:00.000Z",
   updatedAt: "2026-05-31T10:00:00.000Z",
   ...overrides
 });
 
 describe("buildDashboardStats", () => {
-  it("computes weekly/monthly totals and aggregates", () => {
+  it("computes meeting and usage totals with chart series", () => {
     const meetings = [
       baseMeeting({ meetingDate: "2026-05-31", platform: "Webex", meetingType: "Status Review" }),
-      baseMeeting({ meetingDate: "2026-05-30", platform: "Zoom", meetingType: "Internal Sync" }),
+      baseMeeting({
+        meetingDate: "2026-05-30",
+        platform: "Zoom",
+        meetingType: "Internal Sync",
+        usageMetrics: { promptTokens: 5, outputTokens: 5, totalTokens: 10, transcriptWordCount: 60 }
+      }),
       baseMeeting({ meetingDate: "2026-04-12", platform: "Webex", meetingType: "Status Review" })
     ];
 
     const stats = buildDashboardStats(meetings, new Date("2026-05-31T12:00:00.000Z"));
 
     expect(stats.totalMeetings).toBe(3);
+    expect(stats.meetingsToday).toBe(1);
     expect(stats.meetingsThisWeek).toBe(2);
-    expect(stats.meetingsPreviousWeek).toBe(0);
     expect(stats.meetingsThisMonth).toBe(2);
-    expect(stats.meetingsPreviousMonth).toBe(1);
+    expect(stats.creditsToday).toBe(30);
+    expect(stats.creditsThisWeek).toBe(40);
+    expect(stats.creditsThisMonth).toBe(40);
+    expect(stats.wordsToday).toBe(120);
+    expect(stats.wordsThisWeek).toBe(180);
+    expect(stats.wordsThisMonth).toBe(180);
     expect(stats.openActionItems).toBe(3);
-    expect(stats.completionRate).toBe(0);
     expect(stats.highRisks).toBe(3);
-    expect(stats.topPlatforms[0].name).toBe("Webex");
-    expect(stats.weeklySeries).toHaveLength(8);
-    expect(stats.monthlySeries).toHaveLength(6);
+    expect(stats.weeklyMeetingSeries).toHaveLength(8);
+    expect(stats.monthlyMeetingSeries).toHaveLength(6);
+    expect(stats.dailyUsageSeries).toHaveLength(14);
   });
 });

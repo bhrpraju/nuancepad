@@ -5,7 +5,7 @@ import { MetadataForm } from "../components/MetadataForm";
 import { MomReportTables } from "../components/MomReportTables";
 import { RecordingInputCard } from "../components/RecordingInputCard";
 import { TranscriptInputCard } from "../components/TranscriptInputCard";
-import type { MeetingMetadata, MeetingReport, SourceType } from "../domain/meeting";
+import type { MeetingMetadata, MeetingReport, SourceType, UsageMetrics } from "../domain/meeting";
 import { aiReportService } from "../services/aiReportService";
 import { meetingService } from "../services/meetingService";
 import { transcriptionService } from "../services/transcriptionService";
@@ -30,6 +30,7 @@ export function NewMeeting() {
   const [recordingFile, setRecordingFile] = useState<File | null>(null);
   const [preparedTranscript, setPreparedTranscript] = useState("");
   const [generatedSourceType, setGeneratedSourceType] = useState<SourceType>("transcript_paste");
+  const [usageMetrics, setUsageMetrics] = useState<UsageMetrics | null>(null);
   const [report, setReport] = useState<MeetingReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -46,16 +47,20 @@ export function NewMeeting() {
     setLoading(true);
     setError("");
     setStatusMessage("");
+    setUsageMetrics(null);
 
     try {
       let workingTranscript = transcript.trim();
+      let transcriptionTokens = 0;
 
       if (inputMode === "recording") {
         if (!recordingFile) {
           throw new Error("Upload a recording file before generating.");
         }
         setStatusMessage("Transcribing recording...");
-        workingTranscript = await transcriptionService.transcribeRecording(recordingFile);
+        const transcriptionResult = await transcriptionService.transcribeRecording(recordingFile);
+        workingTranscript = transcriptionResult.transcript;
+        transcriptionTokens = transcriptionResult.usage.totalTokens;
         setTranscript(workingTranscript);
       }
 
@@ -65,7 +70,13 @@ export function NewMeeting() {
 
       setStatusMessage("Generating meeting summary...");
       const generated = await aiReportService.generateMeetingReport(workingTranscript, { ...metadata, sourceType });
-      setReport(generated);
+      setReport(generated.report);
+      setUsageMetrics({
+        promptTokens: generated.usage.promptTokens,
+        outputTokens: generated.usage.outputTokens,
+        totalTokens: generated.usage.totalTokens + transcriptionTokens,
+        transcriptWordCount: workingTranscript.split(/\s+/).filter(Boolean).length
+      });
       setPreparedTranscript(workingTranscript);
       setGeneratedSourceType(sourceType);
       setStatusMessage("MoM generated successfully.");
@@ -87,6 +98,7 @@ export function NewMeeting() {
       sourceType: generatedSourceType,
       importStatus: "completed",
       rawTranscript: preparedTranscript || transcript,
+      usageMetrics: usageMetrics ?? undefined,
       reportJson: report
     });
 
@@ -130,10 +142,12 @@ export function NewMeeting() {
           onTranscriptChange={(value) => {
             setTranscriptSource("paste");
             setTranscript(value);
+            setUsageMetrics(null);
           }}
           onFileLoaded={(contents, fileName) => {
             setTranscriptSource("file");
             setTranscript(parseTranscriptByFileName(contents, fileName));
+            setUsageMetrics(null);
           }}
         />
       ) : (
@@ -143,6 +157,7 @@ export function NewMeeting() {
             setRecordingFile(file);
             setReport(null);
             setPreparedTranscript("");
+            setUsageMetrics(null);
           }}
         />
       )}

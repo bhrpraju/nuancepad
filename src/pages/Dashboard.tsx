@@ -4,31 +4,44 @@ import type { MeetingDocument } from "../domain/meeting";
 import { meetingService } from "../services/meetingService";
 import { buildDashboardStats } from "../utils/dashboardStats";
 
-function deltaLabel(current: number, previous: number): string {
-  if (previous === 0) {
-    return current > 0 ? "+100%" : "0%";
-  }
-  const delta = Math.round(((current - previous) / previous) * 100);
-  return `${delta > 0 ? "+" : ""}${delta}%`;
+function NumberCard({ label, value }: { label: string; value: number | string }) {
+  return (
+    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-2 text-3xl font-semibold text-slate-900">{value}</p>
+    </article>
+  );
 }
 
-function Sparkline({ values }: { values: number[] }) {
-  const width = 240;
-  const height = 64;
-  const max = Math.max(1, ...values);
-  const step = values.length > 1 ? width / (values.length - 1) : width;
+function LineChart({
+  values,
+  stroke,
+  fill
+}: {
+  values: number[];
+  stroke: string;
+  fill: string;
+}) {
+  const width = 560;
+  const height = 160;
+  const safe = values.length > 0 ? values : [0];
+  const max = Math.max(1, ...safe);
+  const step = safe.length > 1 ? width / (safe.length - 1) : width;
 
-  const points = values
+  const points = safe
     .map((value, index) => {
       const x = index * step;
-      const y = height - (value / max) * (height - 8) - 4;
+      const y = height - (value / max) * (height - 16) - 8;
       return `${x},${y}`;
     })
     .join(" ");
 
+  const areaPoints = `0,${height} ${points} ${width},${height}`;
+
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-16 w-full">
-      <polyline fill="none" stroke="#2563eb" strokeWidth="3" points={points} strokeLinecap="round" strokeLinejoin="round" />
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-44 w-full">
+      <polygon points={areaPoints} fill={fill} />
+      <polyline fill="none" stroke={stroke} strokeWidth="3" points={points} strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -41,7 +54,7 @@ function VerticalBars({ labels, values }: { labels: string[]; values: number[] }
       <div className="flex items-end gap-2">
         {values.map((value, index) => (
           <div key={`${labels[index]}-${value}`} className="flex flex-1 flex-col items-center gap-1">
-            <div className="w-full rounded-t bg-sky-500/80" style={{ height: `${Math.max(6, (value / max) * 110)}px` }} />
+            <div className="w-full rounded-t bg-indigo-500/80" style={{ height: `${Math.max(8, (value / max) * 120)}px` }} />
             <span className="text-xs text-slate-500">{labels[index]}</span>
           </div>
         ))}
@@ -72,67 +85,53 @@ export function Dashboard() {
 
   const stats = useMemo(() => buildDashboardStats(meetings), [meetings]);
 
-  const kpis = [
-    {
-      label: "Meetings this week",
-      value: stats.meetingsThisWeek,
-      trend: deltaLabel(stats.meetingsThisWeek, stats.meetingsPreviousWeek),
-      tone: "text-emerald-600"
-    },
-    {
-      label: "Meetings this month",
-      value: stats.meetingsThisMonth,
-      trend: deltaLabel(stats.meetingsThisMonth, stats.meetingsPreviousMonth),
-      tone: "text-blue-600"
-    },
-    {
-      label: "Open action items",
-      value: stats.openActionItems,
-      trend: `${stats.completionRate}% closed`,
-      tone: "text-amber-600"
-    },
-    {
-      label: "High risks",
-      value: stats.highRisks,
-      trend: stats.highRisks > 0 ? "Needs review" : "Healthy",
-      tone: stats.highRisks > 0 ? "text-rose-600" : "text-emerald-600"
-    },
-    {
-      label: "Total meetings",
-      value: stats.totalMeetings,
-      trend: `${stats.topPlatforms[0]?.name ?? "No platform"} leading`,
-      tone: "text-slate-600"
-    }
-  ];
-
   return (
     <section className="space-y-6">
       <header className="space-y-1">
-        <h2 className="text-3xl font-semibold tracking-tight text-slate-900">KPI Dashboard</h2>
-        <p className="text-sm text-slate-600">Weekly and monthly operations view for throughput, execution, and risk posture.</p>
+        <h2 className="text-3xl font-semibold tracking-tight text-slate-900">Dashboard</h2>
+        <p className="text-sm text-slate-600">Meeting activity and usage overview.</p>
       </header>
 
       {loadError && <div className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm text-rose-900">{loadError}</div>}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {kpis.map((kpi) => (
-          <article key={kpi.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-wide text-slate-500">{kpi.label}</p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900">{loading ? "-" : kpi.value}</p>
-            <p className={`mt-1 text-xs font-medium ${kpi.tone}`}>{loading ? "Loading..." : kpi.trend}</p>
-          </article>
-        ))}
-      </div>
+      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-slate-800">Meetings</h3>
+          <span className="text-xs text-slate-500">Today / This week / This month / Overall</span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <NumberCard label="Today" value={loading ? "-" : stats.meetingsToday} />
+          <NumberCard label="This week" value={loading ? "-" : stats.meetingsThisWeek} />
+          <NumberCard label="This month" value={loading ? "-" : stats.meetingsThisMonth} />
+          <NumberCard label="Overall" value={loading ? "-" : stats.totalMeetings} />
+        </div>
+      </article>
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-2">
+      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-slate-800">Credits Usage</h3>
+          <span className="text-xs text-slate-500">Today / This week / This month</span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <NumberCard label="Today" value={loading ? "-" : stats.creditsToday} />
+          <NumberCard label="This week" value={loading ? "-" : stats.creditsThisWeek} />
+          <NumberCard label="This month" value={loading ? "-" : stats.creditsThisMonth} />
+        </div>
+      </article>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-800">Weekly Throughput Trend</h3>
-            <span className="text-xs text-slate-500">Last 8 weeks</span>
+            <h3 className="text-sm font-semibold text-slate-800">Meetings Trend</h3>
+            <span className="text-xs text-slate-500">Last 14 days</span>
           </div>
-          <Sparkline values={stats.weeklySeries.map((item) => item.count)} />
-          <div className="mt-2 grid grid-cols-4 gap-2 text-xs text-slate-500 sm:grid-cols-8">
-            {stats.weeklySeries.map((item) => (
+          <LineChart
+            values={stats.dailyUsageSeries.map((item) => item.meetings)}
+            stroke="#2563eb"
+            fill="rgba(37,99,235,0.12)"
+          />
+          <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-500 sm:grid-cols-7">
+            {stats.dailyUsageSeries.slice(-7).map((item) => (
               <div key={item.label} className="rounded bg-slate-50 px-2 py-1 text-center">
                 {item.label}
               </div>
@@ -142,63 +141,63 @@ export function Dashboard() {
 
         <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-800">Monthly Volume</h3>
-            <span className="text-xs text-slate-500">Last 6 months</span>
+            <h3 className="text-sm font-semibold text-slate-800">Credits Trend</h3>
+            <span className="text-xs text-slate-500">Last 14 days</span>
           </div>
-          <VerticalBars
-            labels={stats.monthlySeries.map((item) => item.label)}
-            values={stats.monthlySeries.map((item) => item.count)}
+          <LineChart
+            values={stats.dailyUsageSeries.map((item) => item.credits)}
+            stroke="#0f766e"
+            fill="rgba(15,118,110,0.12)"
           />
+          <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-500 sm:grid-cols-7">
+            {stats.dailyUsageSeries.slice(-7).map((item) => (
+              <div key={item.label} className="rounded bg-slate-50 px-2 py-1 text-center">
+                {item.label}
+              </div>
+            ))}
+          </div>
         </article>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-800">Platform Distribution</h3>
-          <div className="mt-3 space-y-2">
-            {stats.topPlatforms.length === 0 ? (
-              <p className="text-sm text-slate-500">No data yet.</p>
-            ) : (
-              stats.topPlatforms.map((item) => {
-                const percent = stats.totalMeetings ? Math.round((item.count / stats.totalMeetings) * 100) : 0;
-                return (
-                  <div key={item.name} className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>{item.name}</span>
-                      <span className="font-semibold">{item.count} ({percent}%)</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-slate-100">
-                      <div className="h-2 rounded-full bg-indigo-500" style={{ width: `${percent}%` }} />
-                    </div>
-                  </div>
-                );
-              })
-            )}
+      <div className="grid gap-4 xl:grid-cols-3">
+        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-2">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-800">Monthly Meetings</h3>
+            <span className="text-xs text-slate-500">Last 6 months</span>
           </div>
+          <VerticalBars
+            labels={stats.monthlyMeetingSeries.map((item) => item.label)}
+            values={stats.monthlyMeetingSeries.map((item) => item.count)}
+          />
         </article>
 
         <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-800">Meeting Type Distribution</h3>
-          <div className="mt-3 space-y-2">
-            {stats.topMeetingTypes.length === 0 ? (
-              <p className="text-sm text-slate-500">No data yet.</p>
-            ) : (
-              stats.topMeetingTypes.map((item) => {
-                const percent = stats.totalMeetings ? Math.round((item.count / stats.totalMeetings) * 100) : 0;
-                return (
-                  <div key={item.name} className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>{item.name}</span>
-                      <span className="font-semibold">{item.count} ({percent}%)</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-slate-100">
-                      <div className="h-2 rounded-full bg-sky-500" style={{ width: `${percent}%` }} />
-                    </div>
-                  </div>
-                );
-              })
-            )}
+          <h3 className="text-sm font-semibold text-slate-800">Word Conversion</h3>
+          <div className="mt-3 space-y-3 text-sm">
+            <div className="rounded-lg bg-slate-50 p-3">
+              <p className="text-xs uppercase text-slate-500">Today</p>
+              <p className="mt-1 text-2xl font-semibold text-slate-900">{loading ? "-" : stats.wordsToday}</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-3">
+              <p className="text-xs uppercase text-slate-500">This week</p>
+              <p className="mt-1 text-2xl font-semibold text-slate-900">{loading ? "-" : stats.wordsThisWeek}</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-3">
+              <p className="text-xs uppercase text-slate-500">This month</p>
+              <p className="mt-1 text-2xl font-semibold text-slate-900">{loading ? "-" : stats.wordsThisMonth}</p>
+            </div>
           </div>
+        </article>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Open action items</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-900">{loading ? "-" : stats.openActionItems}</p>
+        </article>
+        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs uppercase tracking-wide text-slate-500">High risks</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-900">{loading ? "-" : stats.highRisks}</p>
         </article>
       </div>
 

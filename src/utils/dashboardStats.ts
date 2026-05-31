@@ -1,18 +1,24 @@
 import type { MeetingDocument } from "../domain/meeting";
 
+type DataPoint = { label: string; count: number };
+type UsagePoint = { label: string; meetings: number; credits: number; words: number };
+
 export interface DashboardStats {
   totalMeetings: number;
+  meetingsToday: number;
   meetingsThisWeek: number;
-  meetingsPreviousWeek: number;
   meetingsThisMonth: number;
-  meetingsPreviousMonth: number;
+  creditsToday: number;
+  creditsThisWeek: number;
+  creditsThisMonth: number;
+  wordsToday: number;
+  wordsThisWeek: number;
+  wordsThisMonth: number;
   openActionItems: number;
-  completionRate: number;
   highRisks: number;
-  topPlatforms: Array<{ name: string; count: number }>;
-  topMeetingTypes: Array<{ name: string; count: number }>;
-  weeklySeries: Array<{ label: string; count: number }>;
-  monthlySeries: Array<{ label: string; count: number }>;
+  weeklyMeetingSeries: DataPoint[];
+  monthlyMeetingSeries: DataPoint[];
+  dailyUsageSeries: UsagePoint[];
   recentMeetings: MeetingDocument[];
 }
 
@@ -39,12 +45,17 @@ const parseMeetingDate = (value: string): Date | null => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-const startOfWeek = (date: Date): Date => {
+const startOfDay = (date: Date): Date => {
   const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+};
+
+const startOfWeek = (date: Date): Date => {
+  const next = startOfDay(date);
   const day = next.getDay();
   const offset = day === 0 ? -6 : 1 - day;
   next.setDate(next.getDate() + offset);
-  next.setHours(0, 0, 0, 0);
   return next;
 };
 
@@ -54,97 +65,125 @@ const addDays = (date: Date, days: number): Date => {
   return next;
 };
 
-const countBy = (values: string[]): Array<{ name: string; count: number }> => {
-  const map = new Map<string, number>();
-
-  values.forEach((value) => {
-    const key = value?.trim() || "Unknown";
-    map.set(key, (map.get(key) ?? 0) + 1);
-  });
-
-  return [...map.entries()]
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 4);
-};
-
 const monthKey = (date: Date): string => `${date.getFullYear()}-${date.getMonth()}`;
 
-const buildWeeklySeries = (dates: Date[], now: Date): Array<{ label: string; count: number }> => {
+const wordCount = (text: string): number => text.split(/\s+/).filter(Boolean).length;
+
+const buildWeeklyMeetingSeries = (dates: Date[], now: Date): DataPoint[] => {
   const currentWeekStart = startOfWeek(now);
-  const series: Array<{ label: string; count: number }> = [];
+  const series: DataPoint[] = [];
 
   for (let index = 7; index >= 0; index -= 1) {
     const bucketStart = addDays(currentWeekStart, -7 * index);
     const bucketEnd = addDays(bucketStart, 7);
     const count = dates.filter((date) => date >= bucketStart && date < bucketEnd).length;
-    const label = `${bucketStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
-    series.push({ label, count });
+    series.push({
+      label: bucketStart.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      count
+    });
   }
 
   return series;
 };
 
-const buildMonthlySeries = (dates: Date[], now: Date): Array<{ label: string; count: number }> => {
-  const series: Array<{ label: string; count: number }> = [];
+const buildMonthlyMeetingSeries = (dates: Date[], now: Date): DataPoint[] => {
+  const series: DataPoint[] = [];
 
   for (let offset = 5; offset >= 0; offset -= 1) {
     const date = new Date(now.getFullYear(), now.getMonth() - offset, 1);
     const key = monthKey(date);
     const count = dates.filter((entry) => monthKey(entry) === key).length;
-    const label = date.toLocaleDateString("en-US", { month: "short" });
-    series.push({ label, count });
+    series.push({ label: date.toLocaleDateString("en-US", { month: "short" }), count });
+  }
+
+  return series;
+};
+
+const buildDailyUsageSeries = (
+  entries: Array<{ date: Date; credits: number; words: number }>,
+  now: Date
+): UsagePoint[] => {
+  const startToday = startOfDay(now);
+  const series: UsagePoint[] = [];
+
+  for (let index = 13; index >= 0; index -= 1) {
+    const bucketStart = addDays(startToday, -index);
+    const bucketEnd = addDays(bucketStart, 1);
+    const inDay = entries.filter((entry) => entry.date >= bucketStart && entry.date < bucketEnd);
+
+    series.push({
+      label: bucketStart.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      meetings: inDay.length,
+      credits: inDay.reduce((sum, entry) => sum + entry.credits, 0),
+      words: inDay.reduce((sum, entry) => sum + entry.words, 0)
+    });
   }
 
   return series;
 };
 
 export const buildDashboardStats = (meetings: MeetingDocument[], now = new Date()): DashboardStats => {
+  const dayStart = startOfDay(now);
   const weekStart = startOfWeek(now);
-  const previousWeekStart = addDays(weekStart, -7);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
-  const withDates = meetings
+  const datedMeetings = meetings
     .map((meeting) => ({ meeting, date: parseMeetingDate(meeting.meetingDate) }))
-    .filter((entry) => Boolean(entry.date)) as Array<{ meeting: MeetingDocument; date: Date }>;
+    .filter((entry): entry is { meeting: MeetingDocument; date: Date } => Boolean(entry.date));
 
-  const meetingsThisWeek = withDates.filter(({ date }) => date >= weekStart).length;
-  const meetingsPreviousWeek = withDates.filter(({ date }) => date >= previousWeekStart && date < weekStart).length;
-  const meetingsThisMonth = withDates.filter(({ date }) => date >= monthStart).length;
-  const meetingsPreviousMonth = withDates.filter(({ date }) => date >= previousMonthStart && date < monthStart).length;
+  const usageByMeeting = datedMeetings.map(({ meeting, date }) => ({
+    date,
+    credits: Math.max(0, Number(meeting.usageMetrics?.totalTokens || 0)),
+    words: Math.max(0, Number(meeting.usageMetrics?.transcriptWordCount || wordCount(meeting.rawTranscript || "")))
+  }));
+
+  const meetingsToday = datedMeetings.filter(({ date }) => date >= dayStart).length;
+  const meetingsThisWeek = datedMeetings.filter(({ date }) => date >= weekStart).length;
+  const meetingsThisMonth = datedMeetings.filter(({ date }) => date >= monthStart).length;
+
+  const creditsToday = usageByMeeting.filter((entry) => entry.date >= dayStart).reduce((sum, entry) => sum + entry.credits, 0);
+  const creditsThisWeek = usageByMeeting
+    .filter((entry) => entry.date >= weekStart)
+    .reduce((sum, entry) => sum + entry.credits, 0);
+  const creditsThisMonth = usageByMeeting
+    .filter((entry) => entry.date >= monthStart)
+    .reduce((sum, entry) => sum + entry.credits, 0);
+
+  const wordsToday = usageByMeeting.filter((entry) => entry.date >= dayStart).reduce((sum, entry) => sum + entry.words, 0);
+  const wordsThisWeek = usageByMeeting
+    .filter((entry) => entry.date >= weekStart)
+    .reduce((sum, entry) => sum + entry.words, 0);
+  const wordsThisMonth = usageByMeeting
+    .filter((entry) => entry.date >= monthStart)
+    .reduce((sum, entry) => sum + entry.words, 0);
 
   const openActionItems = meetings.reduce(
     (sum, meeting) => sum + meeting.reportJson.actionItems.filter((item) => item.status !== "Closed").length,
-    0
-  );
-  const closedActionItems = meetings.reduce(
-    (sum, meeting) => sum + meeting.reportJson.actionItems.filter((item) => item.status === "Closed").length,
     0
   );
   const highRisks = meetings.reduce(
     (sum, meeting) => sum + meeting.reportJson.risks.filter((risk) => risk.severity === "High").length,
     0
   );
-  const totalActionItems = openActionItems + closedActionItems;
-  const completionRate = totalActionItems === 0 ? 0 : Math.round((closedActionItems / totalActionItems) * 100);
-  const dates = withDates.map(({ date }) => date);
+
+  const dates = datedMeetings.map(({ date }) => date);
 
   return {
     totalMeetings: meetings.length,
+    meetingsToday,
     meetingsThisWeek,
-    meetingsPreviousWeek,
     meetingsThisMonth,
-    meetingsPreviousMonth,
+    creditsToday,
+    creditsThisWeek,
+    creditsThisMonth,
+    wordsToday,
+    wordsThisWeek,
+    wordsThisMonth,
     openActionItems,
-    completionRate,
     highRisks,
-    topPlatforms: countBy(meetings.map((meeting) => meeting.platform)),
-    topMeetingTypes: countBy(meetings.map((meeting) => meeting.meetingType)),
-    weeklySeries: buildWeeklySeries(dates, now),
-    monthlySeries: buildMonthlySeries(dates, now),
-    recentMeetings: [...meetings]
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .slice(0, 6)
+    weeklyMeetingSeries: buildWeeklyMeetingSeries(dates, now),
+    monthlyMeetingSeries: buildMonthlyMeetingSeries(dates, now),
+    dailyUsageSeries: buildDailyUsageSeries(usageByMeeting, now),
+    recentMeetings: [...meetings].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 6)
   };
 };

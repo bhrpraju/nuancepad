@@ -47,18 +47,21 @@ describe("NewMeeting", () => {
 
   it("calls AI generation when title and transcript are present", async () => {
     mocks.generateMeetingReport.mockResolvedValue({
-      title: "Weekly Review",
-      attendees: [],
-      executiveSummary: "Summary",
-      keyDiscussionPoints: [{ topic: "Scope", summary: "Discussed scope" }],
-      decisions: [{ decision: "Move ahead", owner: "Unassigned", impact: "Schedule", effectiveDate: "Not specified" }],
-      actionItems: [{ task: "Share plan", owner: "Unassigned", dueDate: "Not specified", priority: "High", status: "Open" }],
-      risks: [{ risk: "Delay", severity: "Medium", owner: "Unassigned", mitigation: "Track", targetDate: "Not specified" }],
-      openQuestions: [],
-      stakeholderConcerns: [{ stakeholder: "Leadership", concern: "Timeline", requiredResponse: "Weekly update", owner: "Unassigned", dueDate: "Not specified" }],
-      additionalDiscussedItems: [{ item: "Budget", notes: "Pending", followUpNeeded: "Yes" }],
-      followUpEmail: "Draft",
-      tags: []
+      report: {
+        title: "Weekly Review",
+        attendees: [],
+        executiveSummary: "Summary",
+        keyDiscussionPoints: [{ topic: "Scope", summary: "Discussed scope" }],
+        decisions: [{ decision: "Move ahead", owner: "Unassigned", impact: "Schedule", effectiveDate: "Not specified" }],
+        actionItems: [{ task: "Share plan", owner: "Unassigned", dueDate: "Not specified", priority: "High", status: "Open" }],
+        risks: [{ risk: "Delay", severity: "Medium", owner: "Unassigned", mitigation: "Track", targetDate: "Not specified" }],
+        openQuestions: [],
+        stakeholderConcerns: [{ stakeholder: "Leadership", concern: "Timeline", requiredResponse: "Weekly update", owner: "Unassigned", dueDate: "Not specified" }],
+        additionalDiscussedItems: [{ item: "Budget", notes: "Pending", followUpNeeded: "Yes" }],
+        followUpEmail: "Draft",
+        tags: []
+      },
+      usage: { promptTokens: 10, outputTokens: 20, totalTokens: 30 }
     });
 
     render(
@@ -77,20 +80,26 @@ describe("NewMeeting", () => {
   });
 
   it("transcribes recording before AI generation in recording mode", async () => {
-    mocks.transcribeRecording.mockResolvedValue("Transcript from recording");
+    mocks.transcribeRecording.mockResolvedValue({
+      transcript: "Transcript from recording",
+      usage: { promptTokens: 5, outputTokens: 5, totalTokens: 10 }
+    });
     mocks.generateMeetingReport.mockResolvedValue({
-      title: "Recording Review",
-      attendees: [],
-      executiveSummary: "Summary",
-      keyDiscussionPoints: [{ topic: "Scope", summary: "Discussed scope" }],
-      decisions: [{ decision: "Move ahead", owner: "Unassigned", impact: "Schedule", effectiveDate: "Not specified" }],
-      actionItems: [{ task: "Share plan", owner: "Unassigned", dueDate: "Not specified", priority: "High", status: "Open" }],
-      risks: [{ risk: "Delay", severity: "Medium", owner: "Unassigned", mitigation: "Track", targetDate: "Not specified" }],
-      openQuestions: [],
-      stakeholderConcerns: [{ stakeholder: "Leadership", concern: "Timeline", requiredResponse: "Weekly update", owner: "Unassigned", dueDate: "Not specified" }],
-      additionalDiscussedItems: [{ item: "Budget", notes: "Pending", followUpNeeded: "Yes" }],
-      followUpEmail: "Draft",
-      tags: []
+      report: {
+        title: "Recording Review",
+        attendees: [],
+        executiveSummary: "Summary",
+        keyDiscussionPoints: [{ topic: "Scope", summary: "Discussed scope" }],
+        decisions: [{ decision: "Move ahead", owner: "Unassigned", impact: "Schedule", effectiveDate: "Not specified" }],
+        actionItems: [{ task: "Share plan", owner: "Unassigned", dueDate: "Not specified", priority: "High", status: "Open" }],
+        risks: [{ risk: "Delay", severity: "Medium", owner: "Unassigned", mitigation: "Track", targetDate: "Not specified" }],
+        openQuestions: [],
+        stakeholderConcerns: [{ stakeholder: "Leadership", concern: "Timeline", requiredResponse: "Weekly update", owner: "Unassigned", dueDate: "Not specified" }],
+        additionalDiscussedItems: [{ item: "Budget", notes: "Pending", followUpNeeded: "Yes" }],
+        followUpEmail: "Draft",
+        tags: []
+      },
+      usage: { promptTokens: 10, outputTokens: 20, totalTokens: 30 }
     });
 
     render(
