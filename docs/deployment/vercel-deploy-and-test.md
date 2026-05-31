@@ -12,6 +12,7 @@ This deployment is full-stack in one Vercel project:
    - `POST /api/generate-report`
    - `POST /api/transcribe-recording`
    - `POST /api/import-recording-link`
+   - `POST /api/send-meeting-email`
 
 ## 2. Prerequisites
 
@@ -83,6 +84,8 @@ VITE_FIREBASE_APP_ID=
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-flash-latest
 GEMINI_FALLBACK_MODEL=gemini-2.0-flash
+RESEND_API_KEY=
+EMAIL_FROM=
 ```
 
 Apply to:
@@ -95,6 +98,7 @@ Important:
 1. Do not use `VITE_` prefix for backend secrets.
 2. `GEMINI_API_KEY` must remain server-side only.
 3. `GEMINI_FALLBACK_MODEL` is optional but recommended to reduce outage impact during model saturation.
+4. `EMAIL_FROM` must be a sender verified by your Resend account/domain.
 
 ## 8. Deploy
 
@@ -135,6 +139,7 @@ Important:
 2. `Copy action items`
 3. `Copy follow-up email`
 4. `Export markdown`
+5. Enter recipients and click `Send follow-up email` (backend auto-send)
 
 ### E. Webex Link Flow (Milestone C)
 
@@ -151,6 +156,7 @@ Important:
 2. Remove `GEMINI_API_KEY` in Preview env and redeploy -> `AI provider not configured.` expected
 3. Remove Firebase vars -> app still functions using local-storage mode
 4. Use a Webex link requiring interactive sign-in/passcode page -> `manual_upload_required` expected
+5. Remove `RESEND_API_KEY` and click `Send follow-up email` -> `Email provider not configured` expected
 
 ## 11. Go / No-Go Checklist
 

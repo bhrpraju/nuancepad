@@ -47,6 +47,8 @@ VITE_FIREBASE_APP_ID=
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-flash-latest
 GEMINI_FALLBACK_MODEL=gemini-2.0-flash
+RESEND_API_KEY=
+EMAIL_FROM=
 ```
 
 If Firebase vars are missing, app runs in local-storage mode.
@@ -58,6 +60,7 @@ NuancePad now uses backend API routes for AI operations:
 
 - `POST /api/generate-report`
 - `POST /api/transcribe-recording`
+- `POST /api/send-meeting-email`
 
 Set backend env vars in Vercel:
 
@@ -65,6 +68,8 @@ Set backend env vars in Vercel:
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-flash-latest
 GEMINI_FALLBACK_MODEL=gemini-2.0-flash
+RESEND_API_KEY=
+EMAIL_FROM=
 ```
 
 For local full-stack testing, use:

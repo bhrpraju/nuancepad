@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { MeetingDocument } from "../domain/meeting";
+import { emailService } from "../services/emailService";
 
 interface ExportActionsProps {
   meeting: Pick<MeetingDocument, "title" | "meetingDate" | "clientProject" | "platform" | "reportJson">;
@@ -78,6 +79,9 @@ const copy = async (text: string) => navigator.clipboard.writeText(text);
 
 export function ExportActions({ meeting }: ExportActionsProps) {
   const [emailTo, setEmailTo] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [sendStatus, setSendStatus] = useState("");
+  const [sendError, setSendError] = useState("");
   const markdown = toMarkdown(meeting);
   const emailSubject = useMemo(() => `MoM: ${meeting.title} (${meeting.meetingDate})`, [meeting.meetingDate, meeting.title]);
   const emailBody = useMemo(() => toEmailBody(meeting), [meeting]);
@@ -85,6 +89,25 @@ export function ExportActions({ meeting }: ExportActionsProps) {
     () => `mailto:${encodeURIComponent(emailTo.trim())}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`,
     [emailBody, emailSubject, emailTo]
   );
+
+  const onSendBackendEmail = async () => {
+    if (!emailTo.trim() || sendingEmail) {
+      return;
+    }
+
+    setSendError("");
+    setSendStatus("");
+    setSendingEmail(true);
+    try {
+      await emailService.sendMeetingEmail({ to: emailTo.trim(), meeting });
+      setSendStatus("Email sent successfully.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to send email.";
+      setSendError(message);
+    } finally {
+      setSendingEmail(false);
+    }
+  };
 
   return (
     <section className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
@@ -119,14 +142,26 @@ export function ExportActions({ meeting }: ExportActionsProps) {
         </a>
       </div>
 
-      <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+      <div className="grid gap-2 md:grid-cols-[1fr_auto_auto]">
         <input
           type="text"
           className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
           placeholder="Email recipients (comma-separated)"
           value={emailTo}
-          onChange={(e) => setEmailTo(e.target.value)}
+          onChange={(e) => {
+            setEmailTo(e.target.value);
+            setSendStatus("");
+            setSendError("");
+          }}
         />
+        <button
+          type="button"
+          onClick={onSendBackendEmail}
+          disabled={!emailTo.trim() || sendingEmail}
+          className={`rounded-lg px-3 py-2 text-sm text-center ${emailTo.trim() && !sendingEmail ? "bg-slate-900 text-white" : "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400"}`}
+        >
+          {sendingEmail ? "Sending..." : "Send follow-up email"}
+        </button>
         <a
           href={emailTo.trim() ? emailHref : "#"}
           onClick={(e) => {
@@ -134,11 +169,13 @@ export function ExportActions({ meeting }: ExportActionsProps) {
               e.preventDefault();
             }
           }}
-          className={`rounded-lg px-3 py-2 text-sm text-center ${emailTo.trim() ? "bg-slate-900 text-white" : "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400"}`}
+          className={`rounded-lg border px-3 py-2 text-sm text-center ${emailTo.trim() ? "border-slate-300 bg-white text-slate-900" : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"}`}
         >
-          Send follow-up email
+          Open email client
         </a>
       </div>
+      {sendStatus && <p className="text-xs text-emerald-700">{sendStatus}</p>}
+      {sendError && <p className="text-xs text-rose-700">{sendError}</p>}
     </section>
   );
 }
