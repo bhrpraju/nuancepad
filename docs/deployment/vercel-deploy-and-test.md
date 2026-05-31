@@ -86,6 +86,10 @@ GEMINI_MODEL=gemini-flash-latest
 GEMINI_FALLBACK_MODEL=gemini-2.0-flash
 RESEND_API_KEY=
 EMAIL_FROM=
+EMAIL_PROVIDER=gmail
+GMAIL_USER=
+GMAIL_APP_PASSWORD=
+EMAIL_REPLY_TO=
 ```
 
 Apply to:
@@ -98,7 +102,8 @@ Important:
 1. Do not use `VITE_` prefix for backend secrets.
 2. `GEMINI_API_KEY` must remain server-side only.
 3. `GEMINI_FALLBACK_MODEL` is optional but recommended to reduce outage impact during model saturation.
-4. `EMAIL_FROM` must be a sender verified by your Resend account/domain.
+4. For Gmail provider, `GMAIL_APP_PASSWORD` must be a Google App Password generated after enabling 2-Step Verification.
+5. For Resend provider, `EMAIL_FROM` must be a sender verified by your Resend account/domain.
 
 ## 8. Deploy
 

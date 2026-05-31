@@ -59,6 +59,10 @@ GEMINI_MODEL=gemini-flash-latest
 GEMINI_FALLBACK_MODEL=gemini-2.0-flash
 RESEND_API_KEY=
 EMAIL_FROM=
+EMAIL_PROVIDER=gmail
+GMAIL_USER=
+GMAIL_APP_PASSWORD=
+EMAIL_REPLY_TO=
 ```
 
 If Firebase vars are missing, app runs in local-storage mode.
@@ -72,6 +76,18 @@ NuancePad now uses backend API routes for AI operations:
 - `POST /api/transcribe-recording`
 - `POST /api/send-meeting-email`
 
+Email provider options:
+
+1. Gmail SMTP (recommended for your setup)
+   - `EMAIL_PROVIDER=gmail`
+   - `GMAIL_USER` = your Gmail address
+   - `GMAIL_APP_PASSWORD` = Google App Password (not your normal Gmail password)
+   - `EMAIL_FROM` = sender address (usually same as `GMAIL_USER`)
+2. Resend
+   - `EMAIL_PROVIDER=resend`
+   - `RESEND_API_KEY`
+   - `EMAIL_FROM` on verified domain
+
 Set backend env vars in Vercel:
 
 ```bash
@@ -80,6 +96,10 @@ GEMINI_MODEL=gemini-flash-latest
 GEMINI_FALLBACK_MODEL=gemini-2.0-flash
 RESEND_API_KEY=
 EMAIL_FROM=
+EMAIL_PROVIDER=gmail
+GMAIL_USER=
+GMAIL_APP_PASSWORD=
+EMAIL_REPLY_TO=
 ```
 
 For local full-stack testing, use:

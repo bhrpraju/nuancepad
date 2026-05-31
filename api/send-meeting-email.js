@@ -1,3 +1,5 @@
+import nodemailer from "nodemailer";
+
 function json(res, status, body) {
   res.status(status).setHeader("Content-Type", "application/json");
   res.end(JSON.stringify(body));
@@ -241,6 +243,23 @@ function friendlyEmailError(status, upstreamText) {
   return "Email send failed. Check recipient list and sender configuration, then retry.";
 }
 
+function friendlyGmailError(errorMessage) {
+  const textBody = String(errorMessage || "").toLowerCase();
+  if (textBody.includes("invalid login") || textBody.includes("badcredentials")) {
+    return "Gmail authentication failed. Use GMAIL_USER and a valid Gmail App Password.";
+  }
+  if (textBody.includes("application-specific password required")) {
+    return "Gmail requires an App Password. Enable 2-Step Verification and create an App Password for mail.";
+  }
+  if (textBody.includes("daily user sending quota exceeded")) {
+    return "Gmail daily sending quota exceeded. Retry later or use another sender account.";
+  }
+  if (textBody.includes("from") && textBody.includes("not authorized")) {
+    return "The configured EMAIL_FROM is not authorized for this Gmail account. Use your Gmail address or an allowed alias.";
+  }
+  return "Email send failed via Gmail. Verify Gmail credentials and sender address.";
+}
+
 export default async function handler(req, res) {
   try {
     if (req.method !== "POST") {
@@ -248,10 +267,21 @@ export default async function handler(req, res) {
       return;
     }
 
-    const resendApiKey = process.env.RESEND_API_KEY;
-    const fromEmail = process.env.EMAIL_FROM;
-    if (!resendApiKey || !fromEmail) {
-      text(res, 500, "Email provider not configured. Set RESEND_API_KEY and EMAIL_FROM.");
+    const provider = String(process.env.EMAIL_PROVIDER || "").toLowerCase();
+    const resendApiKey = String(process.env.RESEND_API_KEY || "");
+    const gmailUser = String(process.env.GMAIL_USER || "");
+    const gmailAppPassword = String(process.env.GMAIL_APP_PASSWORD || "");
+    const fromEmail = String(process.env.EMAIL_FROM || gmailUser || "");
+
+    const useGmail = provider === "gmail" || (!provider && gmailUser && gmailAppPassword);
+    const useResend = provider === "resend" || (!useGmail && !provider && Boolean(resendApiKey));
+
+    if (!fromEmail || (!useGmail && !useResend)) {
+      text(
+        res,
+        500,
+        "Email provider not configured. For Gmail set EMAIL_PROVIDER=gmail, GMAIL_USER, GMAIL_APP_PASSWORD, EMAIL_FROM. For Resend set EMAIL_PROVIDER=resend, RESEND_API_KEY, EMAIL_FROM."
+      );
       return;
     }
 
@@ -278,6 +308,37 @@ export default async function handler(req, res) {
     const subject = subjectByType(emailType, meeting);
     const html = buildHtmlByType(meeting, emailType);
     const textBody = buildTextByType(meeting, emailType);
+
+    if (useGmail) {
+      if (!gmailUser || !gmailAppPassword) {
+        text(res, 500, "Gmail not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD.");
+        return;
+      }
+
+      const transport = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: gmailUser,
+          pass: gmailAppPassword
+        }
+      });
+
+      try {
+        const info = await transport.sendMail({
+          from: fromEmail,
+          to: recipients.join(", "),
+          subject,
+          html,
+          text: textBody,
+          replyTo: process.env.EMAIL_REPLY_TO || undefined
+        });
+        json(res, 200, { status: "sent", provider: "gmail", id: info?.messageId || "" });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown Gmail send failure.";
+        text(res, 502, friendlyGmailError(message));
+      }
+      return;
+    }
 
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
