@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTranscriptByFileName } from "./transcriptParsers";
+import { cleanTranscriptForMom, parseTranscriptByFileName } from "./transcriptParsers";
 
 describe("transcript parser", () => {
   it("strips timestamps in srt", () => {
@@ -14,5 +14,17 @@ describe("transcript parser", () => {
 
   it("keeps plain text for txt", () => {
     expect(parseTranscriptByFileName("line 1\nline 2", "notes.txt")).toBe("line 1\nline 2");
+  });
+
+  it("cleans timestamp-only and duplicated lines", () => {
+    const raw = `Gauri Sinha
+35:51
+We are done with updates.
+We are done with updates.
+
+Camilo Gaitan
+36:04
+Bye bye.`;
+    expect(cleanTranscriptForMom(raw)).toBe("Gauri Sinha\nWe are done with updates.\n\nCamilo Gaitan\nBye bye.");
   });
 });

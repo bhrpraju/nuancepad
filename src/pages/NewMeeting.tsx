@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ComplianceNotice } from "../components/ComplianceNotice";
+import { ExportActions } from "../components/ExportActions";
 import { MetadataForm } from "../components/MetadataForm";
 import { MomReportTables } from "../components/MomReportTables";
 import { RecordingInputCard } from "../components/RecordingInputCard";
@@ -11,7 +12,7 @@ import { meetingService } from "../services/meetingService";
 import { linkImportService } from "../services/linkImportService";
 import { transcriptionService } from "../services/transcriptionService";
 import { defaultMeetingReport } from "../utils/meetingSchema";
-import { parseTranscriptByFileName } from "../utils/transcriptParsers";
+import { cleanTranscriptForMom, parseTranscriptByFileName } from "../utils/transcriptParsers";
 
 const baseMetadata: Omit<MeetingMetadata, "sourceType"> = {
   title: "",
@@ -81,7 +82,7 @@ export function NewMeeting() {
     setUsageMetrics(null);
 
     try {
-      let workingTranscript = transcript.trim();
+      let workingTranscript = cleanTranscriptForMom(transcript.trim());
       let transcriptionTokens = 0;
 
       if (inputMode === "recording") {
@@ -91,7 +92,7 @@ export function NewMeeting() {
           }
           setStatusMessage("Transcribing recording...");
           const transcriptionResult = await transcriptionService.transcribeRecording(recordingFile);
-          workingTranscript = transcriptionResult.transcript;
+          workingTranscript = cleanTranscriptForMom(transcriptionResult.transcript);
           transcriptionTokens = transcriptionResult.usage.totalTokens;
           setTranscript(workingTranscript);
         } else {
@@ -110,7 +111,7 @@ export function NewMeeting() {
             throw new Error(`manual_upload_required: ${linkResult.reason}. ${linkResult.details}`);
           }
 
-          workingTranscript = linkResult.transcript;
+          workingTranscript = cleanTranscriptForMom(linkResult.transcript);
           setTranscript(workingTranscript);
         }
       }
@@ -325,6 +326,18 @@ export function NewMeeting() {
 
       {statusMessage && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{statusMessage}</div>}
       {error && <div className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm text-rose-900">{error}</div>}
+
+      {report && (
+        <ExportActions
+          meeting={{
+            title: metadata.title,
+            meetingDate: metadata.meetingDate,
+            clientProject: metadata.clientProject,
+            platform: metadata.platform,
+            reportJson: report
+          }}
+        />
+      )}
 
       {report ? <MomReportTables report={report} /> : <MomReportTables report={defaultMeetingReport()} />}
     </section>
