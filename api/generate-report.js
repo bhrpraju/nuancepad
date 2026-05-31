@@ -50,54 +50,63 @@ ${transcript}
 }
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    text(res, 405, "Method not allowed");
-    return;
-  }
-
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    text(res, 500, "AI provider not configured.");
-    return;
-  }
-
-  const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-  const transcript = body?.transcript;
-  const metadata = body?.metadata;
-
-  if (!transcript || !String(transcript).trim()) {
-    text(res, 400, "Transcript is required.");
-    return;
-  }
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${DEFAULT_MODEL}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: buildPrompt(transcript, metadata) }] }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.2 }
-      })
-    }
-  );
-
-  if (!response.ok) {
-    text(res, 502, "Failed to generate meeting report.");
-    return;
-  }
-
-  const payload = await response.json();
-  const textResult = payload?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-  if (!textResult) {
-    text(res, 502, "AI provider returned empty content.");
-    return;
-  }
-
   try {
-    json(res, 200, JSON.parse(stripCodeFences(textResult)));
-  } catch {
-    text(res, 502, "AI provider returned invalid JSON.");
+    if (req.method !== "POST") {
+      text(res, 405, "Method not allowed");
+      return;
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      text(res, 500, "AI provider not configured.");
+      return;
+    }
+
+    const body =
+      typeof req.body === "string"
+        ? JSON.parse(req.body)
+        : req.body ?? {};
+    const transcript = body?.transcript;
+    const metadata = body?.metadata;
+
+    if (!transcript || !String(transcript).trim()) {
+      text(res, 400, "Transcript is required.");
+      return;
+    }
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${DEFAULT_MODEL}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: buildPrompt(transcript, metadata) }] }],
+          generationConfig: { responseMimeType: "application/json", temperature: 0.2 }
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const upstream = await response.text();
+      text(res, 502, `Failed to generate meeting report. Upstream: ${upstream.slice(0, 400)}`);
+      return;
+    }
+
+    const payload = await response.json();
+    const textResult = payload?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!textResult) {
+      text(res, 502, "AI provider returned empty content.");
+      return;
+    }
+
+    try {
+      json(res, 200, JSON.parse(stripCodeFences(textResult)));
+    } catch {
+      text(res, 502, "AI provider returned invalid JSON.");
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unexpected server error.";
+    text(res, 500, `Backend error: ${message}`);
   }
 }
