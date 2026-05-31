@@ -190,17 +190,6 @@ export function Dashboard() {
         </article>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Open action items</p>
-          <p className="mt-2 text-3xl font-semibold text-slate-900">{loading ? "-" : stats.openActionItems}</p>
-        </article>
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs uppercase tracking-wide text-slate-500">High risks</p>
-          <p className="mt-2 text-3xl font-semibold text-slate-900">{loading ? "-" : stats.highRisks}</p>
-        </article>
-      </div>
-
       <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-slate-800">Recent Meetings</h3>
