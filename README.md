@@ -23,6 +23,16 @@ NuancePad is a corporate-safe meeting intelligence app.
 - Safe direct transcript-link import attempt (no bypass behavior)
 - Explicit `manual_upload_required` fallback when provider interaction/controls are required
 
+## Email actions
+
+After MoM generation, NuancePad supports backend email send options:
+
+- Send Full MoM
+- Send Action Items
+- Send Decisions
+- Send Risks & Concerns
+- Send Follow-up Email
+
 ## Compliance boundary
 
 NuancePad only processes authorized content and does not bypass SSO, CAPTCHA, DRM, disabled downloads, passcodes, or company access controls.

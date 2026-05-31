@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { MeetingDocument } from "../domain/meeting";
-import { emailService } from "../services/emailService";
+import { emailService, type MeetingEmailType } from "../services/emailService";
 
 interface ExportActionsProps {
   meeting: Pick<MeetingDocument, "title" | "meetingDate" | "clientProject" | "platform" | "reportJson">;
@@ -79,7 +79,7 @@ const copy = async (text: string) => navigator.clipboard.writeText(text);
 
 export function ExportActions({ meeting }: ExportActionsProps) {
   const [emailTo, setEmailTo] = useState("");
-  const [sendingEmail, setSendingEmail] = useState(false);
+  const [sendingEmailType, setSendingEmailType] = useState<MeetingEmailType | null>(null);
   const [sendStatus, setSendStatus] = useState("");
   const [sendError, setSendError] = useState("");
   const markdown = toMarkdown(meeting);
@@ -90,22 +90,29 @@ export function ExportActions({ meeting }: ExportActionsProps) {
     [emailBody, emailSubject, emailTo]
   );
 
-  const onSendBackendEmail = async () => {
-    if (!emailTo.trim() || sendingEmail) {
+  const sendButtonLabel = (type: MeetingEmailType, defaultLabel: string) => {
+    if (sendingEmailType === type) {
+      return "Sending...";
+    }
+    return defaultLabel;
+  };
+
+  const onSendBackendEmail = async (emailType: MeetingEmailType) => {
+    if (!emailTo.trim() || sendingEmailType) {
       return;
     }
 
     setSendError("");
     setSendStatus("");
-    setSendingEmail(true);
+    setSendingEmailType(emailType);
     try {
-      await emailService.sendMeetingEmail({ to: emailTo.trim(), meeting });
+      await emailService.sendMeetingEmail({ to: emailTo.trim(), emailType, meeting });
       setSendStatus("Email sent successfully.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to send email.";
       setSendError(message);
     } finally {
-      setSendingEmail(false);
+      setSendingEmailType(null);
     }
   };
 
@@ -142,11 +149,15 @@ export function ExportActions({ meeting }: ExportActionsProps) {
         </a>
       </div>
 
-      <div className="grid gap-2 md:grid-cols-[1fr_auto_auto]">
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-slate-700" htmlFor="recipients-input">
+          Recipients
+        </label>
         <input
+          id="recipients-input"
           type="text"
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-          placeholder="Email recipients (comma-separated)"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          placeholder="name@company.com, team@company.com"
           value={emailTo}
           onChange={(e) => {
             setEmailTo(e.target.value);
@@ -154,14 +165,53 @@ export function ExportActions({ meeting }: ExportActionsProps) {
             setSendError("");
           }}
         />
+        <p className="text-xs text-slate-600">Choose what you want to email from this MoM.</p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={onSendBackendEmail}
-          disabled={!emailTo.trim() || sendingEmail}
-          className={`rounded-lg px-3 py-2 text-sm text-center ${emailTo.trim() && !sendingEmail ? "bg-slate-900 text-white" : "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400"}`}
+          onClick={() => onSendBackendEmail("full_mom")}
+          disabled={!emailTo.trim() || Boolean(sendingEmailType)}
+          className={`rounded-lg px-3 py-2 text-sm ${emailTo.trim() && !sendingEmailType ? "bg-slate-900 text-white" : "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400"}`}
         >
-          {sendingEmail ? "Sending..." : "Send follow-up email"}
+          {sendButtonLabel("full_mom", "Send Full MoM")}
         </button>
+        <button
+          type="button"
+          onClick={() => onSendBackendEmail("action_items")}
+          disabled={!emailTo.trim() || Boolean(sendingEmailType)}
+          className={`rounded-lg border px-3 py-2 text-sm ${emailTo.trim() && !sendingEmailType ? "border-slate-300 bg-white text-slate-900" : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"}`}
+        >
+          {sendButtonLabel("action_items", "Send Action Items")}
+        </button>
+        <button
+          type="button"
+          onClick={() => onSendBackendEmail("decisions")}
+          disabled={!emailTo.trim() || Boolean(sendingEmailType)}
+          className={`rounded-lg border px-3 py-2 text-sm ${emailTo.trim() && !sendingEmailType ? "border-slate-300 bg-white text-slate-900" : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"}`}
+        >
+          {sendButtonLabel("decisions", "Send Decisions")}
+        </button>
+        <button
+          type="button"
+          onClick={() => onSendBackendEmail("risks_and_concerns")}
+          disabled={!emailTo.trim() || Boolean(sendingEmailType)}
+          className={`rounded-lg border px-3 py-2 text-sm ${emailTo.trim() && !sendingEmailType ? "border-slate-300 bg-white text-slate-900" : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"}`}
+        >
+          {sendButtonLabel("risks_and_concerns", "Send Risks & Concerns")}
+        </button>
+        <button
+          type="button"
+          onClick={() => onSendBackendEmail("follow_up_email")}
+          disabled={!emailTo.trim() || Boolean(sendingEmailType)}
+          className={`rounded-lg border px-3 py-2 text-sm ${emailTo.trim() && !sendingEmailType ? "border-slate-300 bg-white text-slate-900" : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"}`}
+        >
+          {sendButtonLabel("follow_up_email", "Send Follow-up Email")}
+        </button>
+      </div>
+
+      <div className="flex justify-end">
         <a
           href={emailTo.trim() ? emailHref : "#"}
           onClick={(e) => {

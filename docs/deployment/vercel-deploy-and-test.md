@@ -139,7 +139,12 @@ Important:
 2. `Copy action items`
 3. `Copy follow-up email`
 4. `Export markdown`
-5. Enter recipients and click `Send follow-up email` (backend auto-send)
+5. Enter recipients and test each backend email action:
+   - `Send Full MoM`
+   - `Send Action Items`
+   - `Send Decisions`
+   - `Send Risks & Concerns`
+   - `Send Follow-up Email`
 
 ### E. Webex Link Flow (Milestone C)
 

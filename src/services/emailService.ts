@@ -1,7 +1,15 @@
 import type { MeetingDocument } from "../domain/meeting";
 
+export type MeetingEmailType =
+  | "full_mom"
+  | "action_items"
+  | "decisions"
+  | "risks_and_concerns"
+  | "follow_up_email";
+
 interface SendMeetingEmailPayload {
   to: string;
+  emailType: MeetingEmailType;
   meeting: Pick<MeetingDocument, "title" | "meetingDate" | "clientProject" | "platform" | "reportJson">;
 }
 
