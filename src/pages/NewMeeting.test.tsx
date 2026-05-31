@@ -146,13 +146,13 @@ describe("NewMeeting", () => {
     );
 
     fireEvent.change(screen.getByLabelText("Meeting title"), { target: { value: "Webex review" } });
-    fireEvent.click(screen.getByRole("button", { name: "Paste Webex link" }));
+    fireEvent.click(screen.getByRole("button", { name: "Webex link helper" }));
     fireEvent.change(screen.getByPlaceholderText("https://...webex.com/..."), { target: { value: "https://example.webex.com/replay" } });
     fireEvent.click(screen.getByRole("button", { name: "Generate MoM" }));
 
     await waitFor(() => {
       expect(mocks.importAuthorizedLink).toHaveBeenCalledTimes(1);
-      expect(screen.getByText(/manual_upload_required/i)).toBeInTheDocument();
+      expect(screen.getByText(/passcode must be entered inside webex playback page/i)).toBeInTheDocument();
     });
   });
 });

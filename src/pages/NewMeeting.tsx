@@ -40,6 +40,26 @@ export function NewMeeting() {
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
 
+  const toFriendlyImportError = (message: string): string => {
+    if (!message.startsWith("manual_upload_required:")) {
+      return message;
+    }
+
+    if (message.includes("passcode_entry_required")) {
+      return "Webex link opened, but passcode must be entered inside Webex playback page. After opening the recording, download transcript/recording there and upload it here.";
+    }
+
+    if (message.includes("interactive_passcode_or_session_required")) {
+      return "Webex needs one more browser step after passcode/session validation. Open the link in Webex, then download transcript/recording and upload it here.";
+    }
+
+    if (message.includes("sso_or_login_required")) {
+      return "Webex link requires interactive login/session in browser. NuancePad backend cannot click sign-in or page prompts. Open in Webex, then download transcript/recording and upload here.";
+    }
+
+    return "This Webex link requires interactive browser steps. Download transcript/recording from Webex and upload here.";
+  };
+
   const sourceType = useMemo<SourceType>(() => {
     if (inputMode === "recording") {
       return recordingIntakeMode === "link" ? "recording_link" : "recording_file";
@@ -112,7 +132,8 @@ export function NewMeeting() {
       setGeneratedSourceType(sourceType);
       setStatusMessage("MoM generated successfully.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to generate report.");
+      const raw = err instanceof Error ? err.message : "Failed to generate report.";
+      setError(toFriendlyImportError(raw));
       setStatusMessage("");
     } finally {
       setLoading(false);
@@ -178,7 +199,7 @@ export function NewMeeting() {
             }}
             className={`rounded-lg px-3 py-2 text-sm ${selectedImportMode === "recording_link" ? "bg-slate-900 text-white" : "border border-slate-300 bg-white"}`}
           >
-            Paste Webex link
+            Webex link helper
           </button>
         </div>
       </div>
@@ -210,7 +231,13 @@ export function NewMeeting() {
         />
       ) : (
         <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <h3 className="font-semibold">Webex Link Import</h3>
+          <h3 className="font-semibold">Browser-Session Import Helper (Webex)</h3>
+          <p className="text-sm text-slate-600">Fastest path: open link, finish access in Webex browser page, then bring transcript/recording back to NuancePad.</p>
+          <ol className="list-decimal space-y-1 pl-4 text-xs text-slate-500">
+            <li>Paste recording link and passcode from your share email.</li>
+            <li>Use <span className="font-medium text-slate-700">Open link in browser</span> and complete passcode/SSO in Webex.</li>
+            <li>If direct import is blocked, upload transcript or recording file here and continue.</li>
+          </ol>
           <label className="text-sm">
             <span className="mb-1 block font-medium">Webex recording link</span>
             <input
@@ -237,6 +264,37 @@ export function NewMeeting() {
               }}
             />
           </label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-50"
+              disabled={!recordingUrl.trim()}
+              onClick={() => {
+                window.open(recordingUrl.trim(), "_blank", "noopener,noreferrer");
+              }}
+            >
+              Open link in browser
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+              onClick={() => {
+                setInputMode("transcript");
+              }}
+            >
+              Switch to transcript
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+              onClick={() => {
+                setInputMode("recording");
+                setRecordingIntakeMode("file");
+              }}
+            >
+              Switch to file upload
+            </button>
+          </div>
           <p className="text-xs text-slate-500">If this link requires interactive sign-in/CAPTCHA, use manual file or transcript upload.</p>
         </section>
       )}

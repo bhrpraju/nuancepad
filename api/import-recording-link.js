@@ -31,13 +31,20 @@ function isProbablyTranscriptResource(url, contentType) {
   );
 }
 
-function detectHtmlGateReason(html) {
+function detectHtmlGateReason(html, passcodeProvided) {
   const content = html.toLowerCase();
 
   if (content.includes("recording password") || content.includes("enter the recording password")) {
     return manual(
       "passcode_entry_required",
       "Provider requires passcode entry inside hosted page. Download transcript or recording manually and upload to NuancePad."
+    );
+  }
+
+  if (passcodeProvided) {
+    return manual(
+      "interactive_passcode_or_session_required",
+      "Passcode was provided, but the provider still requires interactive browser flow. Open the recording in Webex, then download transcript/recording and upload manually."
     );
   }
 
@@ -168,7 +175,7 @@ export default async function handler(req, res) {
 
     if (String(contentType).toLowerCase().includes("text/html")) {
       const html = await response.text();
-      json(res, 200, detectHtmlGateReason(html));
+      json(res, 200, detectHtmlGateReason(html, Boolean(passcode)));
       return;
     }
 
