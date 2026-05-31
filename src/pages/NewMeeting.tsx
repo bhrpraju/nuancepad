@@ -47,6 +47,13 @@ export function NewMeeting() {
     return transcriptSource === "file" ? "transcript_file" : "transcript_paste";
   }, [inputMode, recordingIntakeMode, transcriptSource]);
 
+  const selectedImportMode = useMemo(() => {
+    if (inputMode === "transcript") {
+      return "transcript";
+    }
+    return recordingIntakeMode === "file" ? "recording_file" : "recording_link";
+  }, [inputMode, recordingIntakeMode]);
+
   const onGenerate = async () => {
     setLoading(true);
     setError("");
@@ -142,26 +149,41 @@ export function NewMeeting() {
       <MetadataForm value={metadata} onChange={setMetadata} />
 
       <div className="rounded-xl border border-slate-200 bg-white p-3">
-        <p className="text-sm font-medium">Input mode</p>
+        <p className="text-sm font-medium">Import method</p>
         <div className="mt-2 flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => setInputMode("transcript")}
-            className={`rounded-lg px-3 py-2 text-sm ${inputMode === "transcript" ? "bg-slate-900 text-white" : "border border-slate-300 bg-white"}`}
+            onClick={() => {
+              setInputMode("transcript");
+            }}
+            className={`rounded-lg px-3 py-2 text-sm ${selectedImportMode === "transcript" ? "bg-slate-900 text-white" : "border border-slate-300 bg-white"}`}
           >
-            Transcript (recommended)
+            Paste transcript
           </button>
           <button
             type="button"
-            onClick={() => setInputMode("recording")}
-            className={`rounded-lg px-3 py-2 text-sm ${inputMode === "recording" ? "bg-slate-900 text-white" : "border border-slate-300 bg-white"}`}
+            onClick={() => {
+              setInputMode("recording");
+              setRecordingIntakeMode("file");
+            }}
+            className={`rounded-lg px-3 py-2 text-sm ${selectedImportMode === "recording_file" ? "bg-slate-900 text-white" : "border border-slate-300 bg-white"}`}
           >
-            Recording upload (advanced)
+            Upload file
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setInputMode("recording");
+              setRecordingIntakeMode("link");
+            }}
+            className={`rounded-lg px-3 py-2 text-sm ${selectedImportMode === "recording_link" ? "bg-slate-900 text-white" : "border border-slate-300 bg-white"}`}
+          >
+            Paste Webex link
           </button>
         </div>
       </div>
 
-      {inputMode === "transcript" ? (
+      {selectedImportMode === "transcript" ? (
         <TranscriptInputCard
           transcript={transcript}
           onTranscriptChange={(value) => {
@@ -175,76 +197,47 @@ export function NewMeeting() {
             setUsageMetrics(null);
           }}
         />
+      ) : selectedImportMode === "recording_file" ? (
+        <RecordingInputCard
+          file={recordingFile}
+          onFileChange={(file) => {
+            setRecordingFile(file);
+            setGeneratedSourceType("recording_file");
+            setReport(null);
+            setPreparedTranscript("");
+            setUsageMetrics(null);
+          }}
+        />
       ) : (
         <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <h3 className="font-semibold">Recording Intake (advanced)</h3>
-          <p className="text-sm text-slate-600">
-            Use file upload for the fastest path. Use authorized Webex link import only when you have access and passcode details.
-          </p>
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setRecordingIntakeMode("file")}
-              className={`rounded-lg px-3 py-2 text-sm ${recordingIntakeMode === "file" ? "bg-slate-900 text-white" : "border border-slate-300 bg-white"}`}
-            >
-              Upload file
-            </button>
-            <button
-              type="button"
-              onClick={() => setRecordingIntakeMode("link")}
-              className={`rounded-lg px-3 py-2 text-sm ${recordingIntakeMode === "link" ? "bg-slate-900 text-white" : "border border-slate-300 bg-white"}`}
-            >
-              Authorized link import (Webex)
-            </button>
-          </div>
-
-          {recordingIntakeMode === "file" ? (
-            <RecordingInputCard
-              file={recordingFile}
-              onFileChange={(file) => {
-                setRecordingFile(file);
-                setGeneratedSourceType("recording_file");
+          <h3 className="font-semibold">Webex Link Import</h3>
+          <label className="text-sm">
+            <span className="mb-1 block font-medium">Webex recording link</span>
+            <input
+              className="w-full rounded border p-2"
+              placeholder="https://...webex.com/..."
+              value={recordingUrl}
+              onChange={(e) => {
+                setRecordingUrl(e.target.value);
+                setGeneratedSourceType("recording_link");
                 setReport(null);
                 setPreparedTranscript("");
                 setUsageMetrics(null);
               }}
             />
-          ) : (
-            <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
-              <label className="text-sm">
-                <span className="mb-1 block font-medium">Webex recording link</span>
-                <input
-                  className="w-full rounded border p-2"
-                  placeholder="https://...webex.com/..."
-                  value={recordingUrl}
-                  onChange={(e) => {
-                    setRecordingUrl(e.target.value);
-                    setGeneratedSourceType("recording_link");
-                    setReport(null);
-                    setPreparedTranscript("");
-                    setUsageMetrics(null);
-                  }}
-                />
-              </label>
-              <label className="text-sm">
-                <span className="mb-1 block font-medium">Passcode (if provided)</span>
-                <input
-                  className="w-full rounded border p-2"
-                  placeholder="Enter passcode from share email"
-                  value={recordingPasscode}
-                  onChange={(e) => {
-                    setRecordingPasscode(e.target.value);
-                  }}
-                />
-              </label>
-              <p className="text-xs text-slate-500">
-                If the provider page requires interactive sign-in/passcode/CAPTCHA, NuancePad will return
-                <code className="mx-1">manual_upload_required</code>
-                and ask for manual transcript/recording upload.
-              </p>
-            </div>
-          )}
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block font-medium">Passcode (if provided)</span>
+            <input
+              className="w-full rounded border p-2"
+              placeholder="Enter passcode from share email"
+              value={recordingPasscode}
+              onChange={(e) => {
+                setRecordingPasscode(e.target.value);
+              }}
+            />
+          </label>
+          <p className="text-xs text-slate-500">If this link requires interactive sign-in/CAPTCHA, use manual file or transcript upload.</p>
         </section>
       )}
 
@@ -263,7 +256,7 @@ export function NewMeeting() {
           }
           onClick={onGenerate}
         >
-          {loading ? "Processing..." : inputMode === "recording" ? "Transcribe & Generate MoM" : "Generate MoM"}
+          {loading ? "Processing..." : "Generate MoM"}
         </button>
         {report && (
           <button type="button" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm" onClick={onSave}>

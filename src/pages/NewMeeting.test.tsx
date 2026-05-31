@@ -117,11 +117,11 @@ describe("NewMeeting", () => {
     );
 
     fireEvent.change(screen.getByLabelText("Meeting title"), { target: { value: "Recording Review" } });
-    fireEvent.click(screen.getByRole("button", { name: "Recording upload (advanced)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Upload file" }));
 
     const file = new File(["audio"], "call.mp3", { type: "audio/mpeg" });
     fireEvent.change(screen.getByTestId("recording-file-input"), { target: { files: [file] } });
-    fireEvent.click(screen.getByRole("button", { name: "Transcribe & Generate MoM" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate MoM" }));
 
     await waitFor(() => {
       expect(mocks.transcribeRecording).toHaveBeenCalledTimes(1);
@@ -146,10 +146,9 @@ describe("NewMeeting", () => {
     );
 
     fireEvent.change(screen.getByLabelText("Meeting title"), { target: { value: "Webex review" } });
-    fireEvent.click(screen.getByRole("button", { name: "Recording upload (advanced)" }));
-    fireEvent.click(screen.getByRole("button", { name: "Authorized link import (Webex)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Paste Webex link" }));
     fireEvent.change(screen.getByPlaceholderText("https://...webex.com/..."), { target: { value: "https://example.webex.com/replay" } });
-    fireEvent.click(screen.getByRole("button", { name: "Transcribe & Generate MoM" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate MoM" }));
 
     await waitFor(() => {
       expect(mocks.importAuthorizedLink).toHaveBeenCalledTimes(1);
