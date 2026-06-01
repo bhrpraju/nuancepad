@@ -34,6 +34,7 @@ const basePayload = {
   meetingType: "Status Review",
   platform: "Webex",
   sharedBy: "",
+  momTemplate: "standard_mom" as const,
   sourceType: "transcript_paste" as const,
   importStatus: "completed" as const,
   rawTranscript: "Transcript",

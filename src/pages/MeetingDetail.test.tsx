@@ -23,7 +23,9 @@ describe("MeetingDetail", () => {
       meetingType: "Status Review",
       platform: "Webex",
       sharedBy: "",
+      momTemplate: "standard_mom",
       sourceType: "manual_fallback_after_link",
+      finalIntakeMethod: "manual_fallback_after_link",
       importStatus: "completed",
       detectedPlatform: "webex",
       linkImportStatus: "manual_upload_required",
@@ -58,7 +60,7 @@ describe("MeetingDetail", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Ingestion Metadata")).toBeInTheDocument();
-      expect(screen.getByText(/manual fallback after link attempt/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/manual fallback after link attempt/i).length).toBeGreaterThan(0);
       expect(screen.getByText(/manual upload required/i)).toBeInTheDocument();
     });
   });

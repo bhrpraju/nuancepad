@@ -40,6 +40,33 @@ NuancePad is a corporate-safe meeting intelligence app.
   - fallback reason code
   - attempted/completed timestamps
 
+## Milestone D included
+
+- Universal authorized import adapters expanded with compliance-safe routing:
+  - Webex safe link adapter
+  - Zoom API-backed adapter when OAuth token/scopes are configured
+  - Microsoft Teams / Graph-backed adapter when tenant token/scopes are configured
+  - Google Meet + Drive API-backed adapter when authorized token/scopes are configured
+  - Generic/Other hard fallback adapter
+- Standardized adapter outcomes across providers:
+  - `completed`
+  - `manual_upload_required`
+  - `failed`
+- Extended diagnostics persistence:
+  - source type
+  - final intake method
+  - platform
+  - import status/reason
+  - attempted/completed timestamps
+  - adapter/provider summary (safe non-sensitive only)
+- Corporate intelligence templates for MoM emphasis (schema remains unchanged):
+  - Standard MoM
+  - Executive Summary
+  - Project Status
+  - Client Review
+  - Risk & Action Tracker
+  - Technical Discussion
+
 ## Email actions
 
 After MoM generation, NuancePad supports backend email send options:
@@ -54,8 +81,14 @@ After MoM generation, NuancePad supports backend email send options:
 
 NuancePad only processes authorized content and does not bypass SSO, CAPTCHA, DRM, disabled downloads, passcodes, or company access controls.
 
-Milestone C fallback reason codes:
+Milestone C/D fallback reason codes:
 
+- `oauth_or_scope_missing`
+- `policy_blocked_download`
+- `artifact_not_available`
+- `transcript_not_available`
+- `recording_not_available`
+- `provider_unsupported`
 - `sso_or_login_required`
 - `interactive_passcode_or_session_required`
 - `captcha_or_bot_protection`
@@ -93,6 +126,9 @@ EMAIL_PROVIDER=gmail
 GMAIL_USER=
 GMAIL_APP_PASSWORD=
 EMAIL_REPLY_TO=
+ZOOM_OAUTH_ACCESS_TOKEN=
+MS_GRAPH_ACCESS_TOKEN=
+GOOGLE_ACCESS_TOKEN=
 ```
 
 If Firebase vars are missing, app runs in local-storage mode.
@@ -130,7 +166,16 @@ EMAIL_PROVIDER=gmail
 GMAIL_USER=
 GMAIL_APP_PASSWORD=
 EMAIL_REPLY_TO=
+ZOOM_OAUTH_ACCESS_TOKEN=
+MS_GRAPH_ACCESS_TOKEN=
+GOOGLE_ACCESS_TOKEN=
 ```
+
+Provider token notes:
+
+1. `ZOOM_OAUTH_ACCESS_TOKEN`: required for Zoom API cloud recording/transcript lookup path.
+2. `MS_GRAPH_ACCESS_TOKEN`: required for Teams/SharePoint/OneDrive Graph artifact retrieval path.
+3. `GOOGLE_ACCESS_TOKEN`: required for Google Drive artifact retrieval path (Meet artifacts routed through Drive where applicable).
 
 For local full-stack testing, use:
 

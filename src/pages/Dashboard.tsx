@@ -122,7 +122,7 @@ export function Dashboard() {
       <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-slate-800">Link Intake Metrics</h3>
-          <span className="text-xs text-slate-500">Milestone C diagnostics</span>
+          <span className="text-xs text-slate-500">Milestone C + D diagnostics</span>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <NumberCard label="Attempted" value={loading ? "-" : stats.linkImportsAttempted} />
@@ -156,6 +156,60 @@ export function Dashboard() {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="mt-3 grid gap-3 xl:grid-cols-2">
+          <div className="overflow-hidden rounded-lg border border-slate-200">
+            <table className="w-full border-collapse text-sm">
+              <thead className="bg-slate-100 text-left">
+                <tr>
+                  <th className="border-b px-3 py-2">Fallback reason</th>
+                  <th className="border-b px-3 py-2">Count</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.linkReasonBreakdown.length === 0 ? (
+                  <tr>
+                    <td colSpan={2} className="px-3 py-4 text-center text-slate-500">
+                      No fallback reasons yet.
+                    </td>
+                  </tr>
+                ) : (
+                  stats.linkReasonBreakdown.map((item) => (
+                    <tr key={`${item.label}-${item.count}`} className="odd:bg-white even:bg-slate-50">
+                      <td className="border-b px-3 py-2 capitalize">{item.label}</td>
+                      <td className="border-b px-3 py-2">{item.count}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="overflow-hidden rounded-lg border border-slate-200">
+            <table className="w-full border-collapse text-sm">
+              <thead className="bg-slate-100 text-left">
+                <tr>
+                  <th className="border-b px-3 py-2">Template usage</th>
+                  <th className="border-b px-3 py-2">Count</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.templateUsageBreakdown.length === 0 ? (
+                  <tr>
+                    <td colSpan={2} className="px-3 py-4 text-center text-slate-500">
+                      No templates used yet.
+                    </td>
+                  </tr>
+                ) : (
+                  stats.templateUsageBreakdown.map((item) => (
+                    <tr key={`${item.label}-${item.count}`} className="odd:bg-white even:bg-slate-50">
+                      <td className="border-b px-3 py-2 capitalize">{item.label}</td>
+                      <td className="border-b px-3 py-2">{item.count}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </article>
 

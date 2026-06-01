@@ -10,6 +10,7 @@ const baseMeeting = (overrides: Partial<MeetingDocument>): MeetingDocument => ({
   meetingType: "Status Review",
   platform: "Webex",
   sharedBy: "Ops",
+  momTemplate: "standard_mom",
   sourceType: "transcript_paste",
   importStatus: "completed",
   rawTranscript: "...",
@@ -54,9 +55,16 @@ describe("buildDashboardStats", () => {
         meetingType: "Internal Sync",
         usageMetrics: { promptTokens: 5, outputTokens: 5, totalTokens: 10, transcriptWordCount: 60 },
         linkImportStatus: "manual_upload_required",
+        linkImportReasonCode: "oauth_or_scope_missing",
         detectedPlatform: "zoom"
       }),
-      baseMeeting({ meetingDate: "2026-04-12", platform: "Webex", meetingType: "Status Review", linkImportStatus: "failed" })
+      baseMeeting({
+        meetingDate: "2026-04-12",
+        platform: "Webex",
+        meetingType: "Status Review",
+        linkImportStatus: "failed",
+        linkImportReasonCode: "network_or_provider_error"
+      })
     ];
 
     const stats = buildDashboardStats(meetings, new Date("2026-05-31T12:00:00.000Z"));
@@ -86,6 +94,16 @@ describe("buildDashboardStats", () => {
         expect.objectContaining({ label: "webex", count: 1 }),
         expect.objectContaining({ label: "zoom", count: 1 })
       ])
+    );
+    expect(stats.linkReasonBreakdown).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "none", count: 1 }),
+        expect.objectContaining({ label: "oauth or scope missing", count: 1 }),
+        expect.objectContaining({ label: "network or provider error", count: 1 })
+      ])
+    );
+    expect(stats.templateUsageBreakdown).toEqual(
+      expect.arrayContaining([expect.objectContaining({ label: "standard mom", count: 3 })])
     );
   });
 });

@@ -1,4 +1,5 @@
 import type { MeetingMetadata } from "../domain/meeting";
+import { MOM_TEMPLATES } from "../utils/linkIntake";
 
 interface MetadataFormProps {
   value: Omit<MeetingMetadata, "sourceType">;
@@ -55,6 +56,16 @@ export function MetadataForm({ value, onChange }: MetadataFormProps) {
       <label className="text-sm">
         <span className="mb-1 block font-medium">Shared by</span>
         <input className="w-full rounded border p-2" value={value.sharedBy} onChange={(e) => update("sharedBy", e.target.value)} />
+      </label>
+      <label className="text-sm md:col-span-2">
+        <span className="mb-1 block font-medium">Intelligence template</span>
+        <select className="w-full rounded border p-2" value={value.momTemplate} onChange={(e) => update("momTemplate", e.target.value)}>
+          {MOM_TEMPLATES.map((template) => (
+            <option key={template.value} value={template.value}>
+              {template.label}
+            </option>
+          ))}
+        </select>
       </label>
     </div>
   );

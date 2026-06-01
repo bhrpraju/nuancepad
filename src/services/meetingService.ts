@@ -89,6 +89,7 @@ const normalizeMeeting = (id: string, data: Partial<MeetingDocument>): MeetingDo
     meetingType: String(data.meetingType || "Status Review"),
     platform: String(data.platform || "Webex"),
     sharedBy: String(data.sharedBy || ""),
+    momTemplate: (data.momTemplate || "standard_mom") as MeetingDocument["momTemplate"],
     sourceType: (data.sourceType || "transcript_paste") as MeetingDocument["sourceType"],
     importStatus: (data.importStatus || "completed") as MeetingDocument["importStatus"],
     recordingUrl: data.recordingUrl,
@@ -99,6 +100,7 @@ const normalizeMeeting = (id: string, data: Partial<MeetingDocument>): MeetingDo
     linkImportAttemptedAt: toIsoTimestamp(data.linkImportAttemptedAt, ""),
     linkImportCompletedAt: toIsoTimestamp(data.linkImportCompletedAt, ""),
     linkImportDiagnostics: data.linkImportDiagnostics,
+    finalIntakeMethod: (data.finalIntakeMethod || data.sourceType || "transcript_paste") as MeetingDocument["sourceType"],
     rawTranscript: String(data.rawTranscript || ""),
     usageMetrics: data.usageMetrics,
     reportJson: reportJson as MeetingDocument["reportJson"],
@@ -122,6 +124,7 @@ export interface MeetingFilters {
   clientProject?: string;
   meetingType?: string;
   platform?: string;
+  momTemplate?: string;
   sourceType?: string;
   linkImportStatus?: string;
 }
@@ -140,10 +143,11 @@ const applyFilters = (meetings: MeetingDocument[], filters: MeetingFilters): Mee
     const matchesProject = !filters.clientProject || meeting.clientProject === filters.clientProject;
     const matchesType = !filters.meetingType || meeting.meetingType === filters.meetingType;
     const matchesPlatform = !filters.platform || meeting.platform === filters.platform;
+    const matchesTemplate = !filters.momTemplate || meeting.momTemplate === filters.momTemplate;
     const matchesSource = !filters.sourceType || meeting.sourceType === filters.sourceType;
     const matchesLinkImportStatus = !filters.linkImportStatus || (meeting.linkImportStatus || "not_attempted") === filters.linkImportStatus;
 
-    return matchesQuery && matchesProject && matchesType && matchesPlatform && matchesSource && matchesLinkImportStatus;
+    return matchesQuery && matchesProject && matchesType && matchesPlatform && matchesTemplate && matchesSource && matchesLinkImportStatus;
   });
 };
 

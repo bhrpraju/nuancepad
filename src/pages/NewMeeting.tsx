@@ -22,7 +22,8 @@ const baseMetadata: Omit<MeetingMetadata, "sourceType"> = {
   meetingDate: new Date().toISOString().slice(0, 10),
   meetingType: "Status Review",
   platform: "Webex",
-  sharedBy: ""
+  sharedBy: "",
+  momTemplate: "standard_mom"
 };
 
 export function NewMeeting() {
@@ -178,6 +179,7 @@ export function NewMeeting() {
       const result = await meetingService.createWithStatus({
         ...metadata,
         sourceType: saveSourceType,
+        finalIntakeMethod: saveSourceType,
         recordingUrl: generatedSourceType === "recording_link" || linkAttempt ? recordingUrl.trim() : undefined,
         importStatus: "completed",
         manualFallbackReason: linkAttempt?.status === "manual_upload_required" ? linkAttempt.reasonCode : undefined,

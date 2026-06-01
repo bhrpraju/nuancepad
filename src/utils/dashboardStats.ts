@@ -26,6 +26,8 @@ export interface DashboardStats {
   linkImportsFailed: number;
   linkImportFallbackRate: number;
   linkPlatformBreakdown: DataPoint[];
+  linkReasonBreakdown: DataPoint[];
+  templateUsageBreakdown: DataPoint[];
 }
 
 const parseMeetingDate = (value: string): Date | null => {
@@ -192,6 +194,24 @@ export const buildDashboardStats = (meetings: MeetingDocument[], now = new Date(
     .map(([label, count]) => ({ label, count }))
     .sort((a, b) => b.count - a.count);
 
+  const reasonMap = new Map<string, number>();
+  for (const meeting of linkAttempts) {
+    const reason = meeting.linkImportReasonCode || "none";
+    reasonMap.set(reason, (reasonMap.get(reason) || 0) + 1);
+  }
+  const linkReasonBreakdown = [...reasonMap.entries()]
+    .map(([label, count]) => ({ label: label.replace(/_/g, " "), count }))
+    .sort((a, b) => b.count - a.count);
+
+  const templateMap = new Map<string, number>();
+  for (const meeting of meetings) {
+    const template = meeting.momTemplate || "standard_mom";
+    templateMap.set(template, (templateMap.get(template) || 0) + 1);
+  }
+  const templateUsageBreakdown = [...templateMap.entries()]
+    .map(([label, count]) => ({ label: label.replace(/_/g, " "), count }))
+    .sort((a, b) => b.count - a.count);
+
   return {
     totalMeetings: meetings.length,
     meetingsToday,
@@ -214,6 +234,8 @@ export const buildDashboardStats = (meetings: MeetingDocument[], now = new Date(
     linkImportsManualUploadRequired,
     linkImportsFailed,
     linkImportFallbackRate,
-    linkPlatformBreakdown
+    linkPlatformBreakdown,
+    linkReasonBreakdown,
+    templateUsageBreakdown
   };
 };

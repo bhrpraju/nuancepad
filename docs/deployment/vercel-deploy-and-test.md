@@ -1,7 +1,7 @@
 # NuancePad Full-Stack Vercel Deploy And Test Guide
 
-Date: May 31, 2026  
-Scope: Milestone A + Milestone B + Milestone C (frontend + backend)
+Date: June 1, 2026  
+Scope: Milestone A + Milestone B + Milestone C + Milestone D (frontend + backend)
 
 ## 1. What Gets Deployed
 
@@ -46,7 +46,7 @@ Use Vercel runtime locally so `/api/*` works:
 vercel dev
 ```
 
-Then open the local URL shown by Vercel and test transcript, recording upload, and Webex link import flows.
+Then open the local URL shown by Vercel and test transcript, recording upload, and multi-provider link import flows.
 
 ## 5. Push Code To GitHub
 
@@ -90,6 +90,9 @@ EMAIL_PROVIDER=gmail
 GMAIL_USER=
 GMAIL_APP_PASSWORD=
 EMAIL_REPLY_TO=
+ZOOM_OAUTH_ACCESS_TOKEN=
+MS_GRAPH_ACCESS_TOKEN=
+GOOGLE_ACCESS_TOKEN=
 ```
 
 Apply to:
@@ -104,6 +107,9 @@ Important:
 3. `GEMINI_FALLBACK_MODEL` is optional but recommended to reduce outage impact during model saturation.
 4. For Gmail provider, `GMAIL_APP_PASSWORD` must be a Google App Password generated after enabling 2-Step Verification.
 5. For Resend provider, `EMAIL_FROM` must be a sender verified by your Resend account/domain.
+6. `ZOOM_OAUTH_ACCESS_TOKEN` enables Zoom cloud recording/transcript API retrieval when permitted.
+7. `MS_GRAPH_ACCESS_TOKEN` enables Teams/SharePoint/OneDrive Graph artifact retrieval when tenant permissions allow.
+8. `GOOGLE_ACCESS_TOKEN` enables Google Meet/Drive artifact retrieval when permissions allow.
 
 ## 8. Deploy
 
@@ -170,6 +176,33 @@ Important:
    - Download/export transcript or recording
    - Upload into NuancePad
 
+### F. Authorized Provider Expansion (Milestone D)
+
+1. Zoom adapter:
+   - Without `ZOOM_OAUTH_ACCESS_TOKEN`: expect `manual_upload_required` + `oauth_or_scope_missing`.
+   - With valid token + accessible transcript artifact: may return `completed`.
+2. Teams adapter:
+   - Without `MS_GRAPH_ACCESS_TOKEN`: expect `manual_upload_required` + `oauth_or_scope_missing`.
+   - With valid token + accessible text artifact: may return `completed`.
+3. Google Meet/Drive adapter:
+   - Without `GOOGLE_ACCESS_TOKEN`: expect `manual_upload_required` + `oauth_or_scope_missing`.
+   - With valid token + accessible Drive text artifact: may return `completed`.
+4. Ensure no bypass behavior:
+   - Interactive gates, policy blocks, or restricted downloads must return manual fallback.
+
+### G. Template Coverage
+
+1. In `New Meeting`, test each template:
+   - Standard MoM
+   - Executive Summary
+   - Project Status
+   - Client Review
+   - Risk & Action Tracker
+   - Technical Discussion
+2. Generate + save meetings for selected templates.
+3. Confirm template visibility in Meeting History and Meeting Detail.
+4. Confirm dashboard template usage metrics update.
+
 ## 10. Negative Tests
 
 1. Upload unsupported file (e.g. `.mov`) -> validation error expected
@@ -178,6 +211,7 @@ Important:
 4. Use a protected link requiring interactive sign-in/passcode page -> `manual_upload_required` expected
 5. Use malformed link -> `failed` with `malformed_link`
 6. Remove `RESEND_API_KEY` and click `Send follow-up email` -> `Email provider not configured` expected
+7. With provider tokens removed, Zoom/Teams/Google link imports should fail safely with `oauth_or_scope_missing`.
 
 ## 11. Go / No-Go Checklist
 
@@ -187,9 +221,11 @@ Go live only if all are true:
 2. Transcript flow works end-to-end
 3. Recording flow works end-to-end
 4. Link intake flow returns deterministic status (`completed`/`manual_upload_required`/`failed`) and clear guidance
-5. Save/history/detail works
-6. Exports work
-7. No blocking runtime errors in browser console or Vercel function logs
+5. Provider adapters fail safely when authorization/policy is unavailable
+6. Template selection persists and is visible in history/detail/dashboard
+7. Save/history/detail works
+8. Exports work
+9. No blocking runtime errors in browser console or Vercel function logs
 
 ## 12. Next Hardening Step
 

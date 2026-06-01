@@ -14,5 +14,7 @@ describe("link intake helpers", () => {
     expect(toFriendlyFallbackMessage("malformed_link")).toMatch(/invalid/i);
     expect(toFriendlyFallbackMessage("sso_or_login_required")).toMatch(/authorized account/i);
     expect(toFriendlyFallbackMessage("unsupported_provider")).toMatch(/not directly importable yet/i);
+    expect(toFriendlyFallbackMessage("oauth_or_scope_missing")).toMatch(/permissions/i);
+    expect(toFriendlyFallbackMessage("provider_unsupported")).toMatch(/not directly importable yet/i);
   });
 });

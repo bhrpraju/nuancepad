@@ -34,6 +34,12 @@ export function MeetingDetail() {
             <span className="font-medium">Source:</span> {linkSourceLabel(meeting.sourceType)}
           </p>
           <p>
+            <span className="font-medium">Final intake method:</span> {linkSourceLabel(meeting.finalIntakeMethod || meeting.sourceType)}
+          </p>
+          <p>
+            <span className="font-medium">Template:</span> {meeting.momTemplate.replace(/_/g, " ")}
+          </p>
+          <p>
             <span className="font-medium">Link import status:</span> {(meeting.linkImportStatus || "not_attempted").replace(/_/g, " ")}
           </p>
           {meeting.detectedPlatform && (
@@ -54,6 +60,11 @@ export function MeetingDetail() {
           {meeting.linkImportCompletedAt && (
             <p>
               <span className="font-medium">Link completed:</span> {meeting.linkImportCompletedAt}
+            </p>
+          )}
+          {meeting.linkImportDiagnostics?.summary && (
+            <p className="sm:col-span-2">
+              <span className="font-medium">Diagnostic summary:</span> {meeting.linkImportDiagnostics.summary}
             </p>
           )}
         </div>

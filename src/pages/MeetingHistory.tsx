@@ -10,19 +10,21 @@ export function MeetingHistory() {
   const [clientProject, setClientProject] = useState("");
   const [meetingType, setMeetingType] = useState("");
   const [platform, setPlatform] = useState("");
+  const [momTemplate, setMomTemplate] = useState("");
   const [sourceType, setSourceType] = useState("");
   const [linkImportStatus, setLinkImportStatus] = useState("");
 
   useEffect(() => {
     meetingService
-      .list({ query, clientProject, meetingType, platform, sourceType, linkImportStatus })
+      .list({ query, clientProject, meetingType, platform, momTemplate, sourceType, linkImportStatus })
       .then(setRows)
       .catch(() => setRows([]));
-  }, [query, clientProject, meetingType, platform, sourceType, linkImportStatus]);
+  }, [query, clientProject, meetingType, platform, momTemplate, sourceType, linkImportStatus]);
 
   const projects = useMemo(() => Array.from(new Set(rows.map((r) => r.clientProject))).filter(Boolean), [rows]);
   const types = useMemo(() => Array.from(new Set(rows.map((r) => r.meetingType))).filter(Boolean), [rows]);
   const platforms = useMemo(() => Array.from(new Set(rows.map((r) => r.platform))).filter(Boolean), [rows]);
+  const templates = useMemo(() => Array.from(new Set(rows.map((r) => r.momTemplate))).filter(Boolean), [rows]);
   const sourceTypes = useMemo(() => Array.from(new Set(rows.map((r) => r.sourceType))).filter(Boolean), [rows]);
   const linkStatuses = useMemo(
     () =>
@@ -38,7 +40,7 @@ export function MeetingHistory() {
         <h2 className="text-2xl font-semibold">Meeting History</h2>
       </header>
 
-      <div className="grid gap-2 md:grid-cols-6">
+      <div className="grid gap-2 md:grid-cols-7">
         <input
           className="rounded border p-2 text-sm"
           placeholder="Search"
@@ -66,6 +68,14 @@ export function MeetingHistory() {
           {platforms.map((item) => (
             <option key={item} value={item}>
               {item}
+            </option>
+          ))}
+        </select>
+        <select className="rounded border p-2 text-sm" value={momTemplate} onChange={(e) => setMomTemplate(e.target.value)}>
+          <option value="">All templates</option>
+          {templates.map((item) => (
+            <option key={item} value={item}>
+              {item.replace(/_/g, " ")}
             </option>
           ))}
         </select>
@@ -99,6 +109,7 @@ export function MeetingHistory() {
               <th className="border-b px-3 py-2">Project</th>
               <th className="border-b px-3 py-2">Type</th>
               <th className="border-b px-3 py-2">Platform</th>
+              <th className="border-b px-3 py-2">Template</th>
               <th className="border-b px-3 py-2">Ingestion</th>
               <th className="border-b px-3 py-2">Link status</th>
               <th className="border-b px-3 py-2">Date</th>
@@ -115,14 +126,15 @@ export function MeetingHistory() {
                 <td className="border-b px-3 py-2">{meeting.clientProject}</td>
                 <td className="border-b px-3 py-2">{meeting.meetingType}</td>
                 <td className="border-b px-3 py-2">{meeting.platform}</td>
-                <td className="border-b px-3 py-2">{linkSourceLabel(meeting.sourceType)}</td>
+                <td className="border-b px-3 py-2">{meeting.momTemplate.replace(/_/g, " ")}</td>
+                <td className="border-b px-3 py-2">{linkSourceLabel(meeting.finalIntakeMethod || meeting.sourceType)}</td>
                 <td className="border-b px-3 py-2">{(meeting.linkImportStatus || "not_attempted").replace(/_/g, " ")}</td>
                 <td className="border-b px-3 py-2">{meeting.meetingDate}</td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
+                <td colSpan={8} className="px-3 py-6 text-center text-slate-500">
                   No meetings found.
                 </td>
               </tr>

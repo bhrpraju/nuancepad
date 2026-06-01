@@ -27,7 +27,26 @@ function normalizeUsage(usage) {
   return { promptTokens, outputTokens, totalTokens };
 }
 
+function buildTemplateGuidance(template) {
+  switch (template) {
+    case "executive_summary":
+      return "Template focus: executive leadership brevity. Prioritize concise summary, major decisions, top risks, and critical actions.";
+    case "project_status":
+      return "Template focus: project status tracking. Emphasize milestones, progress, blockers, dependencies, and near-term delivery dates.";
+    case "client_review":
+      return "Template focus: client review readiness. Emphasize client asks, commitments, approvals, escalations, and stakeholder concerns.";
+    case "risk_action_tracker":
+      return "Template focus: risks and actions. Emphasize risks, owners, mitigation plans, and actionable next steps.";
+    case "technical_discussion":
+      return "Template focus: technical discussion. Emphasize architecture, implementation choices, defects, decisions, and technical follow-ups.";
+    case "standard_mom":
+    default:
+      return "Template focus: balanced standard meeting minutes.";
+  }
+}
+
 function buildPrompt(transcript, metadata) {
+  const template = String(metadata?.momTemplate || "standard_mom");
   return `
 You are NuancePad AI.
 Return valid JSON only matching this contract:
@@ -50,6 +69,8 @@ Rules:
 - If unclear, keep attendees empty and defaults for owners/dates.
 - executiveSummary must be concise (3-5 lines).
 - If transcript incomplete, mention that in executiveSummary.
+- Keep JSON schema unchanged. Adjust emphasis only.
+${buildTemplateGuidance(template)}
 
 Metadata:
 ${JSON.stringify(metadata, null, 2)}

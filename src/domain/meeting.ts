@@ -5,9 +5,23 @@ export type SourceType =
   | "recording_link"
   | "manual_fallback_after_link";
 
+export type MomTemplate =
+  | "standard_mom"
+  | "executive_summary"
+  | "project_status"
+  | "client_review"
+  | "risk_action_tracker"
+  | "technical_discussion";
+
 export type LinkDetectedPlatform = "webex" | "zoom" | "microsoft_teams" | "google_meet" | "other";
 export type LinkImportStatus = "not_attempted" | "completed" | "manual_upload_required" | "failed";
 export type LinkImportReasonCode =
+  | "oauth_or_scope_missing"
+  | "policy_blocked_download"
+  | "artifact_not_available"
+  | "transcript_not_available"
+  | "recording_not_available"
+  | "provider_unsupported"
   | "sso_or_login_required"
   | "interactive_passcode_or_session_required"
   | "captcha_or_bot_protection"
@@ -22,11 +36,13 @@ export type LinkImportReasonCode =
 export interface LinkImportDiagnostics {
   detectedPlatform: LinkDetectedPlatform;
   adapter: string;
+  providerName?: string;
   attemptedAt: string;
   completedAt?: string;
   httpStatus?: number;
   responseContentType?: string;
   resolvedUrlHost?: string;
+  summary?: string;
   message?: string;
 }
 
@@ -94,6 +110,7 @@ export interface MeetingMetadata {
   meetingType: string;
   platform: string;
   sharedBy: string;
+  momTemplate: MomTemplate;
   sourceType: SourceType;
 }
 
@@ -123,6 +140,7 @@ export interface MeetingDocument extends MeetingMetadata {
   linkImportAttemptedAt?: string;
   linkImportCompletedAt?: string;
   linkImportDiagnostics?: LinkImportDiagnostics;
+  finalIntakeMethod?: SourceType;
   rawTranscript: string;
   usageMetrics?: UsageMetrics;
   reportJson: MeetingReport;

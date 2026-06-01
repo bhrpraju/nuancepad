@@ -31,6 +31,7 @@ describe("MeetingHistory", () => {
         clientProject: "",
         meetingType: "",
         platform: "",
+        momTemplate: "",
         sourceType: "",
         linkImportStatus: ""
       });
@@ -47,6 +48,7 @@ describe("MeetingHistory", () => {
         meetingType: "Status Review",
         platform: "Webex",
         sharedBy: "",
+        momTemplate: "standard_mom",
         sourceType: "transcript_paste",
         importStatus: "completed",
         linkImportStatus: "not_attempted",
@@ -83,6 +85,7 @@ describe("MeetingHistory", () => {
       expect(row).not.toBeNull();
       expect(within(row as HTMLTableRowElement).getByText("2026-05-31")).toBeInTheDocument();
       expect(within(row as HTMLTableRowElement).getByText("Status Review")).toBeInTheDocument();
+      expect(within(row as HTMLTableRowElement).getByText("standard mom")).toBeInTheDocument();
       expect(within(row as HTMLTableRowElement).getByText("Pasted transcript")).toBeInTheDocument();
     });
   });

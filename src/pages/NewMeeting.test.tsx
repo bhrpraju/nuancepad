@@ -221,9 +221,10 @@ describe("NewMeeting", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save meeting" }));
 
     await waitFor(() => {
-      expect(mocks.createMeetingWithStatus).toHaveBeenCalledWith(
+        expect(mocks.createMeetingWithStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           sourceType: "manual_fallback_after_link",
+          finalIntakeMethod: "manual_fallback_after_link",
           linkImportStatus: "manual_upload_required",
           linkImportReasonCode: "sso_or_login_required",
           manualFallbackReason: "sso_or_login_required"
@@ -330,6 +331,51 @@ describe("NewMeeting", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Save failed: Permission denied")).toBeInTheDocument();
+    });
+  });
+
+  it("persists selected intelligence template on save", async () => {
+    mocks.generateMeetingReport.mockResolvedValue({
+      report: {
+        title: "Template Review",
+        attendees: [],
+        executiveSummary: "Summary",
+        keyDiscussionPoints: [],
+        decisions: [],
+        actionItems: [],
+        risks: [],
+        openQuestions: [],
+        stakeholderConcerns: [],
+        additionalDiscussedItems: [],
+        followUpEmail: "Draft",
+        tags: []
+      },
+      usage: { promptTokens: 3, outputTokens: 4, totalTokens: 7 }
+    });
+    mocks.createMeetingWithStatus.mockResolvedValue({ id: "meeting-template", storage: "local", fallbackUsed: false });
+
+    render(
+      <MemoryRouter>
+        <NewMeeting />
+      </MemoryRouter>
+    );
+
+    fireEvent.change(screen.getByLabelText("Meeting title"), { target: { value: "Template Review" } });
+    fireEvent.change(screen.getByLabelText("Intelligence template"), { target: { value: "technical_discussion" } });
+    fireEvent.change(screen.getByPlaceholderText("Paste transcript here"), { target: { value: "API and architecture review details." } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate MoM" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Save meeting" })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save meeting" }));
+
+    await waitFor(() => {
+      expect(mocks.createMeetingWithStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          momTemplate: "technical_discussion"
+        })
+      );
     });
   });
 });

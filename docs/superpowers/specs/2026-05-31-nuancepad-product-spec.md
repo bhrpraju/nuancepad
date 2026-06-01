@@ -935,3 +935,39 @@ Success metrics:
    - https://developer.webex.com/meeting/docs/api/v1/recordings
    - https://developer.webex.com/docs/api/v1/meeting-transcripts
    - https://developer.webex.com/docs/sdks/webex-meetings-sdk-web-join-a-meeting
+
+## Milestone D Addendum (Implemented)
+
+Date: June 1, 2026
+
+1. Universal authorized import adapters are now defined and implemented for:
+   - Webex
+   - Zoom (OAuth-gated)
+   - Microsoft Teams / Graph (tenant-consent gated)
+   - Google Meet / Drive (OAuth-gated)
+   - Generic/Other provider hard fallback
+2. Adapter outcomes are standardized:
+   - `completed`
+   - `manual_upload_required`
+   - `failed`
+3. Reason code set is expanded with provider-safe diagnostics:
+   - `oauth_or_scope_missing`
+   - `tenant_or_policy_restricted`
+   - `policy_blocked_download`
+   - `artifact_not_available`
+   - `transcript_not_available`
+   - `recording_not_available`
+   - `provider_unsupported`
+   - plus Milestone C reason codes
+4. Compliance boundary remains unchanged:
+   - No bypass of SSO, CAPTCHA, DRM, disabled downloads, passcodes, tenant controls, or policy controls.
+   - Any blocked/interactive path must return `manual_upload_required` with clear user guidance.
+5. Corporate intelligence template selection is part of meeting metadata and persistence:
+   - Standard MoM
+   - Executive Summary
+   - Project Status
+   - Client Review
+   - Risk & Action Tracker
+   - Technical Discussion
+6. Template selection influences report emphasis only; JSON output schema contract remains unchanged.
+7. History/detail/dashboard now include ingestion diagnostics and template analytics.
