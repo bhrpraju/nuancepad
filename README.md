@@ -81,6 +81,11 @@ After MoM generation, NuancePad supports backend email send options:
 - Send Risks & Concerns
 - Send Follow-up Email
 
+Email formatting expectation:
+
+1. `Open email client` uses `mailto:` and opens your local mail app with a plain-text draft. Complex HTML table formatting is not preserved in this path.
+2. Backend `Send ...` actions send structured HTML + text email content, and should be used for executive-ready formatted MoM delivery.
+
 ## Compliance boundary
 
 NuancePad only processes authorized content and does not bypass SSO, CAPTCHA, DRM, disabled downloads, passcodes, or company access controls.
