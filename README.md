@@ -1,6 +1,10 @@
 # NuancePad
 
-NuancePad is a corporate-safe meeting intelligence app.
+NuancePad is a corporate-safe meeting intelligence web app that converts existing meeting assets—transcripts, uploaded recordings, and authorized meeting links—into structured, executive-ready Minutes of Meeting.
+
+It is designed for teams that cannot rely on meeting bots, browser extensions, desktop recorders, or tenant-wide admin integrations. NuancePad prioritizes transcript-first workflows, safe recording upload, authorized link intake, structured MoM generation, searchable meeting history, dashboard insights, and export/email-ready outputs.
+
+Core positioning: summaries from the recordings you already have, without bypassing SSO, CAPTCHA, DRM, passcodes, disabled downloads, or company access controls.
 
 ## Milestone A included
 
