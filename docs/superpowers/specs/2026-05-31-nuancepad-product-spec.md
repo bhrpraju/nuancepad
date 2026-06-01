@@ -285,6 +285,50 @@ On blocked extraction, system returns explicit fallback:
 2. Reason text for why automation stopped
 3. Optional saved draft of attempted link and metadata
 
+### 7.8 Provider Extraction Feasibility and Contract
+
+Research-based product contract for direct extraction:
+
+1. NuancePad must not assume that a shared playback URL plus passcode is sufficient for backend extraction.
+2. NuancePad must distinguish:
+   - `direct_link_playback` (browser user can watch)
+   - `api_authorized_download` (backend can fetch artifact with valid OAuth/app permissions)
+   - `manual_upload_required` (interactive or policy block)
+3. NuancePad must always prioritize legal/authorized API paths over browser automation for enterprise platforms.
+
+Provider-specific requirements:
+
+1. Zoom
+   - Direct extraction is possible when OAuth/app scopes allow cloud recording access.
+   - Backend path: Zoom Cloud Recording APIs (meeting recordings endpoints) and authenticated download URL usage.
+   - Passcode-protected recordings still require token-authorized access.
+   - If token/scope/policy validation fails, return `manual_upload_required` with explicit reason.
+
+2. Microsoft Teams
+   - Shared links generally point to OneDrive/SharePoint governed resources and are not reliable for unauthenticated backend fetch.
+   - Direct extraction is possible through Microsoft Graph recording/transcript APIs with required Entra permissions and tenant consent.
+   - Tenant policies may allow playback while blocking download; this must map to `manual_upload_required` (policy_blocked_download).
+   - Meeting artifact fetch must treat Graph access and SharePoint/OneDrive access as separate authorization checks.
+
+3. Google Meet
+   - Artifacts are retained in organizer/authorized Drive context.
+   - Direct extraction is possible via Meet artifact APIs plus Drive API download/export with OAuth scopes.
+   - If Drive permissions or download restrictions prevent content retrieval, return `manual_upload_required`.
+   - Transcript entries from Meet API and transcript docs may differ; both should be treated as valid sources with provenance metadata.
+
+4. Webex
+   - Link-only flows commonly require interactive browser/session completion even with passcode.
+   - If interactive step is required (SSO/login/CAPTCHA/player-only controls), return `manual_upload_required` with guided recovery.
+
+Standardized fallback reasons (minimum set):
+
+1. `sso_or_login_required`
+2. `interactive_passcode_or_session_required`
+3. `policy_blocked_download`
+4. `oauth_or_scope_missing`
+5. `artifact_not_available`
+6. `provider_unsupported`
+
 ## 8. UX and Interaction Specification
 
 This section applies UI/UX quality standards for NuancePad web workflows.
@@ -445,33 +489,83 @@ Acceptance criteria:
 1. Supported formats can be processed end-to-end.
 2. Failures provide actionable UI recovery.
 
-### Milestone C: Webex Link Import MVP
+### Milestone C: Authorized Link Intake Foundation
 
 Scope:
 
-1. Link + passcode intake
-2. Authorized transcript/download attempts
-3. Manual fallback path
+1. Link + passcode intake (simple UX)
+2. Provider detection and routing (Webex/Zoom/Teams/Meet/Other)
+3. Webex helper flow and standardized manual fallback path
+4. Persisted import diagnostics (`importStatus`, fallback reason, provider)
 
 Acceptance criteria:
 
-1. At least one valid shared Webex link flow succeeds end-to-end.
-2. Blocked paths return `manual_upload_required` with reason.
-3. No bypass/circumvention behavior exists.
+1. User can paste authorized links and receive deterministic status/result.
+2. Blocked paths return `manual_upload_required` with standardized reason and next step.
+3. Import diagnostics are visible in history/detail and usable for KPI stats.
+4. No bypass/circumvention behavior exists.
 
 ### Milestone D: Universal Import and Intelligence Expansion
 
 Scope:
 
-1. Zoom adapter
-2. Generic adapter
-3. Teams/Meet fallback behavior
-4. Corporate templates and enhanced tracking
+1. Zoom API-backed adapter (OAuth/scopes/download token path)
+2. Teams Graph-backed adapter (tenant-consented artifact retrieval)
+3. Google Meet + Drive adapter (artifact + file retrieval with OAuth scopes)
+4. Generic adapter and enterprise fallback hardening
+5. Corporate templates and enhanced tracking
 
 Acceptance criteria:
 
-1. Auto-detection routes to correct adapter/fallback path.
-2. Meeting intelligence templates are selectable and applied.
+1. Provider-specific API path is used where authorized and available.
+2. Auto-detection routes to correct adapter/fallback path.
+3. Teams/Meet/Zoom failures expose actionable reason codes, not generic errors.
+4. Meeting intelligence templates are selectable and applied.
+
+### Milestone E: Live Meeting Bot Join (Fireflies-Style, Controlled)
+
+Scope:
+
+1. Introduce optional "Live capture" mode for supported platforms.
+2. Join flow inputs:
+   - Meeting link
+   - Meeting platform
+   - Optional passcode
+   - Preferred bot display name
+3. Add calendar-assisted auto-join controls:
+   - All meetings with conferencing link
+   - Only meetings I own
+   - Only when explicitly invited
+4. Add manual "Add to live meeting" entry path for in-progress calls.
+5. Add explicit participant presence model:
+   - `waiting_lobby`
+   - `admission_required`
+   - `joined`
+   - `left`
+6. Capture and persist bot join diagnostics and participant/audit timeline.
+
+Acceptance criteria:
+
+1. User can launch live join request and receive deterministic join status.
+2. System clearly indicates when host admission is required.
+3. No hidden/unattributed bot joins occur.
+4. Meeting capture starts only after bot is confirmed as joined participant.
+
+### Milestone F: Provider-Native Bot and Compliance Hardening
+
+Scope:
+
+1. Zoom Meeting SDK/OAuth hardening for cross-account attribution requirements.
+2. Teams Cloud Communications + real-time media bot path with tenant controls.
+3. Webex SDK/API assisted join path where available and policy-compliant.
+4. Google Meet strategy limited to approved integration surfaces (artifact APIs and add-ons); no undocumented bypass strategy.
+5. Enterprise controls for allowlist/denylist, domain restrictions, and meeting policy checks.
+
+Acceptance criteria:
+
+1. Bot joins are attributable and policy-compliant per provider requirements.
+2. Blocked joins produce explainable reason codes and safe fallback.
+3. Security/compliance controls are enforceable at organization level.
 
 ## 12. Non-Functional Requirements
 
@@ -757,3 +851,87 @@ Phase 7: Enterprise Hardening and Desktop-Local Exploration (Later)
 2. Transcript-first path remains the architectural anchor for speed-to-value.
 3. Link import is adapter-driven, policy-guarded, and fallback-first by design.
 4. Executive communication format is compact, tabular, and default for sharing.
+
+### 18.11 Live Bot Join Architecture (Future Milestones E/F)
+
+Objective:
+
+Enable Fireflies-style "join from link" behavior while remaining attributable, policy-compliant, and enterprise-safe.
+
+Research-based operating model:
+
+1. Fireflies-style behavior is not URL scraping; it is participant bot join orchestration (calendar/manual/live invite + admit flow).
+2. Provider integrations must use official SDK/API paths where available.
+3. Join automation must stop at policy barriers and request user action.
+
+Architecture components:
+
+1. Join Orchestrator Service
+   - Receives join requests from UI/calendar triggers.
+   - Normalizes provider, meeting coordinates, and credential context.
+   - Emits lifecycle states (`queued`, `attempting_join`, `waiting_lobby`, `admission_required`, `joined`, `capture_started`, `ended`, `failed`).
+2. Bot Identity and Session Manager
+   - Manages named bot identities per workspace/org.
+   - Handles token issuance/rotation and short-lived provider credentials.
+   - Enforces per-tenant join policy (allowlist domains, blocked meeting labels, host-only rules).
+3. Provider Join Adapters
+   - Zoom adapter: Meeting SDK + OAuth attribution model for out-of-account meetings.
+   - Teams adapter: Microsoft Graph Cloud Communications calling/meeting bot path with tenant permissions.
+   - Webex adapter: SDK/API-backed meeting join path where allowed, plus recording/transcript API path post-meeting.
+   - Google Meet adapter: approved integration surface only (Meet artifacts APIs + add-ons). No undocumented autonomous join bypass path.
+4. Admission and Consent Handler
+   - Detects and surfaces lobby waiting and host-admit events.
+   - Requires explicit user-visible state before capture starts.
+   - Supports configurable timeout and auto-abandon rules.
+5. Capture and Processing Pipeline
+   - Starts capture only after confirmed joined state.
+   - Streams transcript/audio segments to Intelligence layer.
+   - Produces MoM outputs using existing schema contract.
+6. Compliance and Audit Plane
+   - Logs who requested join, which policy allowed/blocked it, and timeline of join/capture events.
+   - Stores non-sensitive reason codes for every failed/blocked step.
+
+Non-negotiable constraints:
+
+1. No bypass of SSO/CAPTCHA/DRM/tenant controls.
+2. No hidden bot identity; bot must be attributable in participant list/lobby.
+3. If provider policy requires explicit admit, NuancePad cannot force entry.
+4. If provider integration is unavailable, route to transcript/recording upload fallback.
+
+Delivery sequence for live join:
+
+1. E1: Join orchestration + status model + manual live invite UI.
+2. E2: Zoom adapter pilot with strict attribution and consent checks.
+3. E3: Teams adapter pilot with tenant-admin gated rollout.
+4. E4: Webex adapter pilot + admission telemetry.
+5. F1: Unified governance controls and org-level bot policies.
+
+Success metrics:
+
+1. Join success rate by provider.
+2. Admission-required rate and median admit time.
+3. Policy-block rate with top reason codes.
+4. Capture start reliability after joined state.
+5. Manual fallback conversion (upload after blocked join).
+
+## 19. Research References (Live Join and Provider Access)
+
+1. Fireflies invite/join behavior:
+   - https://guide.fireflies.ai/hc/en-us/articles/360020107997-How-to-invite-Fireflies-to-meetings
+   - https://fireflies.zendesk.com/hc/en-us/articles/360020248498-How-Fireflies-joins-and-records-your-meetings-FAQs
+2. Zoom meeting join and recording access:
+   - https://developers.zoom.us/docs/meeting-sdk/
+   - https://developers.zoom.us/docs/meeting-sdk/web/component-view/meetings-webinars/
+   - https://developers.zoom.us/changelog/meeting-sdk/requiring-authorization-for-meetings-joined-outside-of-an-apps-account/
+   - https://developers.zoom.us/docs/api/meetings/
+3. Microsoft Teams bot join surfaces:
+   - https://learn.microsoft.com/en-us/microsoftteams/platform/bots/calls-and-meetings/real-time-media-concepts
+   - https://learn.microsoft.com/en-us/graph/cloud-communications-online-meetings?view=graph-rest-beta
+4. Google Meet artifact and integration surfaces:
+   - https://developers.google.com/workspace/meet/api/guides/artifacts
+   - https://developers.google.com/workspace/meet/api/reference/rest/v2/conferenceRecords.transcripts.entries
+   - https://developers.google.com/workspace/meet/add-ons/guides/concepts
+5. Webex recording/transcript and meetings APIs:
+   - https://developer.webex.com/meeting/docs/api/v1/recordings
+   - https://developer.webex.com/docs/api/v1/meeting-transcripts
+   - https://developer.webex.com/docs/sdks/webex-meetings-sdk-web-join-a-meeting

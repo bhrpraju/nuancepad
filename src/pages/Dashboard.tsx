@@ -119,6 +119,46 @@ export function Dashboard() {
         </div>
       </article>
 
+      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-slate-800">Link Intake Metrics</h3>
+          <span className="text-xs text-slate-500">Milestone C diagnostics</span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <NumberCard label="Attempted" value={loading ? "-" : stats.linkImportsAttempted} />
+          <NumberCard label="Completed" value={loading ? "-" : stats.linkImportsCompleted} />
+          <NumberCard label="Manual required" value={loading ? "-" : stats.linkImportsManualUploadRequired} />
+          <NumberCard label="Failed" value={loading ? "-" : stats.linkImportsFailed} />
+          <NumberCard label="Fallback rate" value={loading ? "-" : `${stats.linkImportFallbackRate}%`} />
+        </div>
+        <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
+          <table className="w-full border-collapse text-sm">
+            <thead className="bg-slate-100 text-left">
+              <tr>
+                <th className="border-b px-3 py-2">Platform</th>
+                <th className="border-b px-3 py-2">Attempts</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stats.linkPlatformBreakdown.length === 0 ? (
+                <tr>
+                  <td colSpan={2} className="px-3 py-4 text-center text-slate-500">
+                    No link import attempts yet.
+                  </td>
+                </tr>
+              ) : (
+                stats.linkPlatformBreakdown.map((item) => (
+                  <tr key={`${item.label}-${item.count}`} className="odd:bg-white even:bg-slate-50">
+                    <td className="border-b px-3 py-2 capitalize">{item.label}</td>
+                    <td className="border-b px-3 py-2">{item.count}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </article>
+
       <div className="grid gap-4 xl:grid-cols-2">
         <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">

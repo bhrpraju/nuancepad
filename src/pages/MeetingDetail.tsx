@@ -4,6 +4,7 @@ import { ExportActions } from "../components/ExportActions";
 import { MomReportTables } from "../components/MomReportTables";
 import type { MeetingDocument } from "../domain/meeting";
 import { meetingService } from "../services/meetingService";
+import { linkSourceLabel } from "../utils/linkIntake";
 
 export function MeetingDetail() {
   const { id = "" } = useParams();
@@ -25,6 +26,38 @@ export function MeetingDetail() {
           {meeting.clientProject} · {meeting.meetingDate} · {meeting.platform}
         </p>
       </header>
+
+      <section className="rounded-lg border border-slate-200 bg-white p-3 text-sm">
+        <h3 className="mb-2 text-sm font-semibold text-slate-800">Ingestion Metadata</h3>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <p>
+            <span className="font-medium">Source:</span> {linkSourceLabel(meeting.sourceType)}
+          </p>
+          <p>
+            <span className="font-medium">Link import status:</span> {(meeting.linkImportStatus || "not_attempted").replace(/_/g, " ")}
+          </p>
+          {meeting.detectedPlatform && (
+            <p>
+              <span className="font-medium">Detected platform:</span> {meeting.detectedPlatform.replace(/_/g, " ")}
+            </p>
+          )}
+          {meeting.linkImportReasonCode && (
+            <p>
+              <span className="font-medium">Fallback reason:</span> {meeting.linkImportReasonCode.replace(/_/g, " ")}
+            </p>
+          )}
+          {meeting.linkImportAttemptedAt && (
+            <p>
+              <span className="font-medium">Link attempt:</span> {meeting.linkImportAttemptedAt}
+            </p>
+          )}
+          {meeting.linkImportCompletedAt && (
+            <p>
+              <span className="font-medium">Link completed:</span> {meeting.linkImportCompletedAt}
+            </p>
+          )}
+        </div>
+      </section>
 
       <ExportActions
         meeting={{

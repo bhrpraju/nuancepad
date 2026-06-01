@@ -93,6 +93,12 @@ const normalizeMeeting = (id: string, data: Partial<MeetingDocument>): MeetingDo
     importStatus: (data.importStatus || "completed") as MeetingDocument["importStatus"],
     recordingUrl: data.recordingUrl,
     manualFallbackReason: data.manualFallbackReason,
+    detectedPlatform: data.detectedPlatform,
+    linkImportStatus: data.linkImportStatus || "not_attempted",
+    linkImportReasonCode: data.linkImportReasonCode,
+    linkImportAttemptedAt: toIsoTimestamp(data.linkImportAttemptedAt, ""),
+    linkImportCompletedAt: toIsoTimestamp(data.linkImportCompletedAt, ""),
+    linkImportDiagnostics: data.linkImportDiagnostics,
     rawTranscript: String(data.rawTranscript || ""),
     usageMetrics: data.usageMetrics,
     reportJson: reportJson as MeetingDocument["reportJson"],
@@ -116,6 +122,8 @@ export interface MeetingFilters {
   clientProject?: string;
   meetingType?: string;
   platform?: string;
+  sourceType?: string;
+  linkImportStatus?: string;
 }
 
 const applyFilters = (meetings: MeetingDocument[], filters: MeetingFilters): MeetingDocument[] => {
@@ -132,8 +140,10 @@ const applyFilters = (meetings: MeetingDocument[], filters: MeetingFilters): Mee
     const matchesProject = !filters.clientProject || meeting.clientProject === filters.clientProject;
     const matchesType = !filters.meetingType || meeting.meetingType === filters.meetingType;
     const matchesPlatform = !filters.platform || meeting.platform === filters.platform;
+    const matchesSource = !filters.sourceType || meeting.sourceType === filters.sourceType;
+    const matchesLinkImportStatus = !filters.linkImportStatus || (meeting.linkImportStatus || "not_attempted") === filters.linkImportStatus;
 
-    return matchesQuery && matchesProject && matchesType && matchesPlatform;
+    return matchesQuery && matchesProject && matchesType && matchesPlatform && matchesSource && matchesLinkImportStatus;
   });
 };
 

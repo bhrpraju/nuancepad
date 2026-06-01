@@ -8,9 +8,11 @@ import { RecordingInputCard } from "../components/RecordingInputCard";
 import { TranscriptInputCard } from "../components/TranscriptInputCard";
 import type { MeetingMetadata, MeetingReport, SourceType, UsageMetrics } from "../domain/meeting";
 import { aiReportService } from "../services/aiReportService";
+import type { LinkAttemptSnapshot } from "../services/linkImportService";
 import { meetingService } from "../services/meetingService";
 import { linkImportService } from "../services/linkImportService";
 import { transcriptionService } from "../services/transcriptionService";
+import { detectPlatformFromLink, toFriendlyFallbackMessage } from "../utils/linkIntake";
 import { defaultMeetingReport } from "../utils/meetingSchema";
 import { cleanTranscriptForMom, parseTranscriptByFileName } from "../utils/transcriptParsers";
 
@@ -44,25 +46,11 @@ export function NewMeeting() {
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState("");
   const [savedMeetingId, setSavedMeetingId] = useState("");
+  const [linkAttempt, setLinkAttempt] = useState<LinkAttemptSnapshot | null>(null);
+  const [linkFallbackPending, setLinkFallbackPending] = useState(false);
 
   const toFriendlyImportError = (message: string): string => {
-    if (!message.startsWith("manual_upload_required:")) {
-      return message;
-    }
-
-    if (message.includes("passcode_entry_required")) {
-      return "Webex link opened, but passcode must be entered inside Webex playback page. After opening the recording, download transcript/recording there and upload it here.";
-    }
-
-    if (message.includes("interactive_passcode_or_session_required")) {
-      return "Webex needs one more browser step after passcode/session validation. Open the link in Webex, then download transcript/recording and upload it here.";
-    }
-
-    if (message.includes("sso_or_login_required")) {
-      return "Webex link requires interactive login/session in browser. NuancePad backend cannot click sign-in or page prompts. Open in Webex, then download transcript/recording and upload here.";
-    }
-
-    return "This Webex link requires interactive browser steps. Download transcript/recording from Webex and upload here.";
+    return message;
   };
 
   const sourceType = useMemo<SourceType>(() => {
@@ -87,6 +75,10 @@ export function NewMeeting() {
     setSaveError("");
     setSavedMeetingId("");
     setUsageMetrics(null);
+    if (selectedImportMode === "recording_link") {
+      setLinkAttempt(null);
+      setLinkFallbackPending(false);
+    }
 
     try {
       let workingTranscript = cleanTranscriptForMom(transcript.trim());
@@ -107,19 +99,40 @@ export function NewMeeting() {
             throw new Error("Enter a recording link before generating.");
           }
 
-          setStatusMessage("Attempting authorized Webex link import...");
+          setStatusMessage("Attempting authorized link import...");
           const linkResult = await linkImportService.importAuthorizedLink({
             platform: metadata.platform,
             recordingUrl: recordingUrl.trim(),
             passcode: recordingPasscode.trim()
           });
 
+          const attemptSnapshot: LinkAttemptSnapshot = {
+            status: linkResult.status,
+            detectedPlatform: linkResult.detectedPlatform,
+            reasonCode: linkResult.status === "completed" ? undefined : linkResult.reasonCode,
+            attemptedAt: linkResult.diagnostics.attemptedAt,
+            completedAt: linkResult.diagnostics.completedAt,
+            diagnostics: linkResult.diagnostics
+          };
+          setLinkAttempt(attemptSnapshot);
+
           if (linkResult.status === "manual_upload_required") {
-            throw new Error(`manual_upload_required: ${linkResult.reason}. ${linkResult.details}`);
+            setLinkFallbackPending(true);
+            setStatusMessage("");
+            setError(toFriendlyFallbackMessage(linkResult.reasonCode));
+            return;
+          }
+
+          if (linkResult.status === "failed") {
+            setLinkFallbackPending(true);
+            setStatusMessage("");
+            setError(linkResult.message);
+            return;
           }
 
           workingTranscript = cleanTranscriptForMom(linkResult.transcript);
           setTranscript(workingTranscript);
+          setLinkFallbackPending(false);
         }
       }
 
@@ -157,11 +170,27 @@ export function NewMeeting() {
     setSaveMessage("Saving...");
 
     try {
+      const saveSourceType: SourceType =
+        linkFallbackPending && generatedSourceType !== "recording_link"
+          ? "manual_fallback_after_link"
+          : generatedSourceType;
+
       const result = await meetingService.createWithStatus({
         ...metadata,
-        sourceType: generatedSourceType,
-        recordingUrl: generatedSourceType === "recording_link" ? recordingUrl.trim() : undefined,
+        sourceType: saveSourceType,
+        recordingUrl: generatedSourceType === "recording_link" || linkAttempt ? recordingUrl.trim() : undefined,
         importStatus: "completed",
+        manualFallbackReason: linkAttempt?.status === "manual_upload_required" ? linkAttempt.reasonCode : undefined,
+        detectedPlatform:
+          linkAttempt?.detectedPlatform ||
+          (generatedSourceType === "recording_link" && recordingUrl.trim()
+            ? detectPlatformFromLink(recordingUrl.trim())
+            : undefined),
+        linkImportStatus: linkAttempt?.status || (linkFallbackPending ? "manual_upload_required" : "not_attempted"),
+        linkImportReasonCode: linkAttempt?.reasonCode,
+        linkImportAttemptedAt: linkAttempt?.attemptedAt,
+        linkImportCompletedAt: linkAttempt?.completedAt,
+        linkImportDiagnostics: linkAttempt?.diagnostics,
         rawTranscript: preparedTranscript || transcript,
         usageMetrics: usageMetrics ?? undefined,
         reportJson: report
@@ -225,7 +254,7 @@ export function NewMeeting() {
             }}
             className={`rounded-lg px-3 py-2 text-sm ${selectedImportMode === "recording_link" ? "bg-slate-900 text-white" : "border border-slate-300 bg-white"}`}
           >
-            Webex link helper
+            Meeting link import
           </button>
         </div>
       </div>
@@ -257,18 +286,18 @@ export function NewMeeting() {
         />
       ) : (
         <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <h3 className="font-semibold">Browser-Session Import Helper (Webex)</h3>
-          <p className="text-sm text-slate-600">Fastest path: open link, finish access in Webex browser page, then bring transcript/recording back to NuancePad.</p>
+          <h3 className="font-semibold">Meeting Link Intake</h3>
+          <p className="text-sm text-slate-600">Paste a recording or meeting link and passcode (if available). NuancePad will only use authorized, non-bypass access paths.</p>
           <ol className="list-decimal space-y-1 pl-4 text-xs text-slate-500">
-            <li>Paste recording link and passcode from your share email.</li>
-            <li>Use <span className="font-medium text-slate-700">Open link in browser</span> and complete passcode/SSO in Webex.</li>
-            <li>If direct import is blocked, upload transcript or recording file here and continue.</li>
+            <li>Paste the link and passcode from your meeting share email.</li>
+            <li>If import needs interactive access, open the link in your browser and complete access with your authorized account.</li>
+            <li>Download/export transcript or recording and upload it here to continue.</li>
           </ol>
           <label className="text-sm">
-            <span className="mb-1 block font-medium">Webex recording link</span>
+            <span className="mb-1 block font-medium">Meeting or recording link</span>
             <input
               className="w-full rounded border p-2"
-              placeholder="https://...webex.com/..."
+              placeholder="https://..."
               value={recordingUrl}
               onChange={(e) => {
                 setRecordingUrl(e.target.value);
@@ -322,6 +351,11 @@ export function NewMeeting() {
             </button>
           </div>
           <p className="text-xs text-slate-500">If this link requires interactive sign-in/CAPTCHA, use manual file or transcript upload.</p>
+          {linkAttempt && (
+            <div className="rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-600">
+              Last link attempt: {linkAttempt.status} · Provider: {linkAttempt.detectedPlatform.replace(/_/g, " ")}
+            </div>
+          )}
         </section>
       )}
 

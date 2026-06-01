@@ -41,14 +41,22 @@ const baseMeeting = (overrides: Partial<MeetingDocument>): MeetingDocument => ({
 describe("buildDashboardStats", () => {
   it("computes meeting and usage totals with chart series", () => {
     const meetings = [
-      baseMeeting({ meetingDate: "2026-05-31", platform: "Webex", meetingType: "Status Review" }),
+      baseMeeting({
+        meetingDate: "2026-05-31",
+        platform: "Webex",
+        meetingType: "Status Review",
+        linkImportStatus: "completed",
+        detectedPlatform: "webex"
+      }),
       baseMeeting({
         meetingDate: "2026-05-30",
         platform: "Zoom",
         meetingType: "Internal Sync",
-        usageMetrics: { promptTokens: 5, outputTokens: 5, totalTokens: 10, transcriptWordCount: 60 }
+        usageMetrics: { promptTokens: 5, outputTokens: 5, totalTokens: 10, transcriptWordCount: 60 },
+        linkImportStatus: "manual_upload_required",
+        detectedPlatform: "zoom"
       }),
-      baseMeeting({ meetingDate: "2026-04-12", platform: "Webex", meetingType: "Status Review" })
+      baseMeeting({ meetingDate: "2026-04-12", platform: "Webex", meetingType: "Status Review", linkImportStatus: "failed" })
     ];
 
     const stats = buildDashboardStats(meetings, new Date("2026-05-31T12:00:00.000Z"));
@@ -68,5 +76,16 @@ describe("buildDashboardStats", () => {
     expect(stats.weeklyMeetingSeries).toHaveLength(8);
     expect(stats.monthlyMeetingSeries).toHaveLength(6);
     expect(stats.dailyUsageSeries).toHaveLength(14);
+    expect(stats.linkImportsAttempted).toBe(3);
+    expect(stats.linkImportsCompleted).toBe(1);
+    expect(stats.linkImportsManualUploadRequired).toBe(1);
+    expect(stats.linkImportsFailed).toBe(1);
+    expect(stats.linkImportFallbackRate).toBe(33.3);
+    expect(stats.linkPlatformBreakdown).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "webex", count: 1 }),
+        expect.objectContaining({ label: "zoom", count: 1 })
+      ])
+    );
   });
 });

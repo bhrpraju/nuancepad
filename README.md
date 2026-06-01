@@ -19,9 +19,26 @@ NuancePad is a corporate-safe meeting intelligence app.
 
 ## Milestone C included
 
-- Authorized Webex link intake (`recording link + passcode` fields)
-- Safe direct transcript-link import attempt (no bypass behavior)
-- Explicit `manual_upload_required` fallback when provider interaction/controls are required
+- Unified meeting-link intake (`link + optional passcode`) for:
+  - Webex
+  - Zoom
+  - Microsoft Teams
+  - Google Meet
+  - Other
+- Provider detection and adapter routing with standardized outcomes:
+  - `completed`
+  - `manual_upload_required`
+  - `failed`
+- Safe deterministic fallback guidance:
+  - Open in browser
+  - Complete authorized access
+  - Download/export transcript or recording
+  - Upload into NuancePad
+- Persisted link-intake diagnostics (no passcode/secret persistence):
+  - detected platform
+  - link import status
+  - fallback reason code
+  - attempted/completed timestamps
 
 ## Email actions
 
@@ -36,6 +53,19 @@ After MoM generation, NuancePad supports backend email send options:
 ## Compliance boundary
 
 NuancePad only processes authorized content and does not bypass SSO, CAPTCHA, DRM, disabled downloads, passcodes, or company access controls.
+
+Milestone C fallback reason codes:
+
+- `sso_or_login_required`
+- `interactive_passcode_or_session_required`
+- `captcha_or_bot_protection`
+- `download_disabled_or_drm_protected`
+- `tenant_or_policy_restricted`
+- `unsupported_provider`
+- `malformed_link`
+- `no_transcript_available`
+- `network_or_provider_error`
+- `unknown_manual_fallback`
 
 ## Setup
 

@@ -20,6 +20,12 @@ export interface DashboardStats {
   monthlyMeetingSeries: DataPoint[];
   dailyUsageSeries: UsagePoint[];
   recentMeetings: MeetingDocument[];
+  linkImportsAttempted: number;
+  linkImportsCompleted: number;
+  linkImportsManualUploadRequired: number;
+  linkImportsFailed: number;
+  linkImportFallbackRate: number;
+  linkPlatformBreakdown: DataPoint[];
 }
 
 const parseMeetingDate = (value: string): Date | null => {
@@ -167,6 +173,24 @@ export const buildDashboardStats = (meetings: MeetingDocument[], now = new Date(
   );
 
   const dates = datedMeetings.map(({ date }) => date);
+  const linkAttempts = meetings.filter((meeting) => (meeting.linkImportStatus || "not_attempted") !== "not_attempted");
+  const linkImportsAttempted = linkAttempts.length;
+  const linkImportsCompleted = linkAttempts.filter((meeting) => meeting.linkImportStatus === "completed").length;
+  const linkImportsManualUploadRequired = linkAttempts.filter(
+    (meeting) => meeting.linkImportStatus === "manual_upload_required"
+  ).length;
+  const linkImportsFailed = linkAttempts.filter((meeting) => meeting.linkImportStatus === "failed").length;
+  const linkImportFallbackRate =
+    linkImportsAttempted === 0 ? 0 : Number(((linkImportsManualUploadRequired / linkImportsAttempted) * 100).toFixed(1));
+
+  const platformMap = new Map<string, number>();
+  for (const meeting of linkAttempts) {
+    const platformKey = (meeting.detectedPlatform || "other").replace(/_/g, " ");
+    platformMap.set(platformKey, (platformMap.get(platformKey) || 0) + 1);
+  }
+  const linkPlatformBreakdown = [...platformMap.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count);
 
   return {
     totalMeetings: meetings.length,
@@ -184,6 +208,12 @@ export const buildDashboardStats = (meetings: MeetingDocument[], now = new Date(
     weeklyMeetingSeries: buildWeeklyMeetingSeries(dates, now),
     monthlyMeetingSeries: buildMonthlyMeetingSeries(dates, now),
     dailyUsageSeries: buildDailyUsageSeries(usageByMeeting, now),
-    recentMeetings: [...meetings].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 6)
+    recentMeetings: [...meetings].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 6),
+    linkImportsAttempted,
+    linkImportsCompleted,
+    linkImportsManualUploadRequired,
+    linkImportsFailed,
+    linkImportFallbackRate,
+    linkPlatformBreakdown
   };
 };

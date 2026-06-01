@@ -1,4 +1,34 @@
-export type SourceType = "transcript_paste" | "transcript_file" | "recording_file" | "recording_link";
+export type SourceType =
+  | "transcript_paste"
+  | "transcript_file"
+  | "recording_file"
+  | "recording_link"
+  | "manual_fallback_after_link";
+
+export type LinkDetectedPlatform = "webex" | "zoom" | "microsoft_teams" | "google_meet" | "other";
+export type LinkImportStatus = "not_attempted" | "completed" | "manual_upload_required" | "failed";
+export type LinkImportReasonCode =
+  | "sso_or_login_required"
+  | "interactive_passcode_or_session_required"
+  | "captcha_or_bot_protection"
+  | "download_disabled_or_drm_protected"
+  | "tenant_or_policy_restricted"
+  | "unsupported_provider"
+  | "malformed_link"
+  | "no_transcript_available"
+  | "network_or_provider_error"
+  | "unknown_manual_fallback";
+
+export interface LinkImportDiagnostics {
+  detectedPlatform: LinkDetectedPlatform;
+  adapter: string;
+  attemptedAt: string;
+  completedAt?: string;
+  httpStatus?: number;
+  responseContentType?: string;
+  resolvedUrlHost?: string;
+  message?: string;
+}
 
 export interface DiscussionPoint {
   topic: string;
@@ -87,6 +117,12 @@ export interface MeetingDocument extends MeetingMetadata {
   recordingUrl?: string;
   importStatus: ImportStatus;
   manualFallbackReason?: string;
+  detectedPlatform?: LinkDetectedPlatform;
+  linkImportStatus?: LinkImportStatus;
+  linkImportReasonCode?: LinkImportReasonCode;
+  linkImportAttemptedAt?: string;
+  linkImportCompletedAt?: string;
+  linkImportDiagnostics?: LinkImportDiagnostics;
   rawTranscript: string;
   usageMetrics?: UsageMetrics;
   reportJson: MeetingReport;

@@ -49,7 +49,7 @@ export function MetadataForm({ value, onChange }: MetadataFormProps) {
           <option value="Zoom">Zoom</option>
           <option value="Microsoft Teams">Microsoft Teams</option>
           <option value="Google Meet">Google Meet</option>
-          <option value="Generic">Generic</option>
+          <option value="Other">Other</option>
         </select>
       </label>
       <label className="text-sm">

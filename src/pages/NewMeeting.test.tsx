@@ -138,8 +138,14 @@ describe("NewMeeting", () => {
   it("shows manual fallback error when authorized link import is blocked", async () => {
     mocks.importAuthorizedLink.mockResolvedValue({
       status: "manual_upload_required",
-      reason: "passcode_entry_required",
-      details: "Provider requires passcode entry in hosted player."
+      reasonCode: "interactive_passcode_or_session_required",
+      message: "Open browser and upload manually.",
+      detectedPlatform: "webex",
+      diagnostics: {
+        detectedPlatform: "webex",
+        adapter: "webex_link_adapter",
+        attemptedAt: "2026-06-01T10:00:00.000Z"
+      }
     });
 
     render(
@@ -149,13 +155,80 @@ describe("NewMeeting", () => {
     );
 
     fireEvent.change(screen.getByLabelText("Meeting title"), { target: { value: "Webex review" } });
-    fireEvent.click(screen.getByRole("button", { name: "Webex link helper" }));
-    fireEvent.change(screen.getByPlaceholderText("https://...webex.com/..."), { target: { value: "https://example.webex.com/replay" } });
+    fireEvent.click(screen.getByRole("button", { name: "Meeting link import" }));
+    fireEvent.change(screen.getByPlaceholderText("https://..."), { target: { value: "https://example.webex.com/replay" } });
     fireEvent.click(screen.getByRole("button", { name: "Generate MoM" }));
 
     await waitFor(() => {
       expect(mocks.importAuthorizedLink).toHaveBeenCalledTimes(1);
-      expect(screen.getByText(/passcode must be entered inside webex playback page/i)).toBeInTheDocument();
+      expect(screen.getByText(/open the link in your browser/i)).toBeInTheDocument();
+    });
+  });
+
+  it("persists link diagnostics when user falls back to manual transcript after link attempt", async () => {
+    mocks.importAuthorizedLink.mockResolvedValue({
+      status: "manual_upload_required",
+      reasonCode: "sso_or_login_required",
+      message: "Open browser and upload manually.",
+      detectedPlatform: "webex",
+      diagnostics: {
+        detectedPlatform: "webex",
+        adapter: "webex_link_adapter",
+        attemptedAt: "2026-06-01T09:00:00.000Z"
+      }
+    });
+    mocks.generateMeetingReport.mockResolvedValue({
+      report: {
+        title: "Weekly Review",
+        attendees: [],
+        executiveSummary: "Summary",
+        keyDiscussionPoints: [],
+        decisions: [],
+        actionItems: [],
+        risks: [],
+        openQuestions: [],
+        stakeholderConcerns: [],
+        additionalDiscussedItems: [],
+        followUpEmail: "Draft",
+        tags: []
+      },
+      usage: { promptTokens: 1, outputTokens: 1, totalTokens: 2 }
+    });
+    mocks.createMeetingWithStatus.mockResolvedValue({ id: "meeting-2", storage: "firebase", fallbackUsed: false });
+
+    render(
+      <MemoryRouter>
+        <NewMeeting />
+      </MemoryRouter>
+    );
+
+    fireEvent.change(screen.getByLabelText("Meeting title"), { target: { value: "Weekly Review" } });
+    fireEvent.click(screen.getByRole("button", { name: "Meeting link import" }));
+    fireEvent.change(screen.getByPlaceholderText("https://..."), { target: { value: "https://example.webex.com/replay" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate MoM" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/open the link in your browser/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Paste transcript" }));
+    fireEvent.change(screen.getByPlaceholderText("Paste transcript here"), { target: { value: "Manual transcript content." } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate MoM" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Save meeting" })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save meeting" }));
+
+    await waitFor(() => {
+      expect(mocks.createMeetingWithStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceType: "manual_fallback_after_link",
+          linkImportStatus: "manual_upload_required",
+          linkImportReasonCode: "sso_or_login_required",
+          manualFallbackReason: "sso_or_login_required"
+        })
+      );
     });
   });
 

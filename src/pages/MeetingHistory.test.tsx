@@ -30,7 +30,9 @@ describe("MeetingHistory", () => {
         query: "budget",
         clientProject: "",
         meetingType: "",
-        platform: ""
+        platform: "",
+        sourceType: "",
+        linkImportStatus: ""
       });
     });
   });
@@ -47,6 +49,7 @@ describe("MeetingHistory", () => {
         sharedBy: "",
         sourceType: "transcript_paste",
         importStatus: "completed",
+        linkImportStatus: "not_attempted",
         rawTranscript: "text",
         reportJson: {
           title: "TPMO Weekly",
@@ -80,6 +83,7 @@ describe("MeetingHistory", () => {
       expect(row).not.toBeNull();
       expect(within(row as HTMLTableRowElement).getByText("2026-05-31")).toBeInTheDocument();
       expect(within(row as HTMLTableRowElement).getByText("Status Review")).toBeInTheDocument();
+      expect(within(row as HTMLTableRowElement).getByText("Pasted transcript")).toBeInTheDocument();
     });
   });
 });

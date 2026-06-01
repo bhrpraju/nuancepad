@@ -151,22 +151,33 @@ Important:
    - `Send Risks & Concerns`
    - `Send Follow-up Email`
 
-### E. Webex Link Flow (Milestone C)
+### E. Link Intake Flow (Milestone C)
 
 1. Switch to `Recording upload (advanced)`
-2. Select `Authorized link import (Webex)`
-3. Paste a Webex recording link and passcode (if provided)
-4. Click `Transcribe & Generate MoM`
-5. Expected result (success path): transcript imported and MoM generated
-6. Expected result (blocked path): error contains `manual_upload_required` with recovery instruction
+2. Select `Meeting link import`
+3. Paste a link + passcode (if provided)
+4. Supported platform expectations:
+   - Webex: direct transcript import may complete for transcript URLs; otherwise clear fallback
+   - Zoom / Teams / Google Meet / Other: deterministic safe fallback unless direct provider-safe path is supported
+5. Click `Generate MoM`
+6. Expected result status:
+   - `completed`
+   - `manual_upload_required`
+   - `failed`
+7. If fallback is returned, user sees simple next steps:
+   - Open link in browser
+   - Complete authorized access
+   - Download/export transcript or recording
+   - Upload into NuancePad
 
 ## 10. Negative Tests
 
 1. Upload unsupported file (e.g. `.mov`) -> validation error expected
 2. Remove `GEMINI_API_KEY` in Preview env and redeploy -> `AI provider not configured.` expected
 3. Remove Firebase vars -> app still functions using local-storage mode
-4. Use a Webex link requiring interactive sign-in/passcode page -> `manual_upload_required` expected
-5. Remove `RESEND_API_KEY` and click `Send follow-up email` -> `Email provider not configured` expected
+4. Use a protected link requiring interactive sign-in/passcode page -> `manual_upload_required` expected
+5. Use malformed link -> `failed` with `malformed_link`
+6. Remove `RESEND_API_KEY` and click `Send follow-up email` -> `Email provider not configured` expected
 
 ## 11. Go / No-Go Checklist
 
@@ -175,7 +186,7 @@ Go live only if all are true:
 1. Deployment `Ready`
 2. Transcript flow works end-to-end
 3. Recording flow works end-to-end
-4. Webex link flow returns either success or explicit `manual_upload_required`
+4. Link intake flow returns deterministic status (`completed`/`manual_upload_required`/`failed`) and clear guidance
 5. Save/history/detail works
 6. Exports work
 7. No blocking runtime errors in browser console or Vercel function logs

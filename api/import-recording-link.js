@@ -1,17 +1,67 @@
 const MAX_TEXT_SIZE = 2 * 1024 * 1024;
 
+const REASONS = {
+  SSO: "sso_or_login_required",
+  INTERACTIVE: "interactive_passcode_or_session_required",
+  CAPTCHA: "captcha_or_bot_protection",
+  DOWNLOAD_DISABLED: "download_disabled_or_drm_protected",
+  TENANT_POLICY: "tenant_or_policy_restricted",
+  UNSUPPORTED: "unsupported_provider",
+  MALFORMED: "malformed_link",
+  NO_TRANSCRIPT: "no_transcript_available",
+  NETWORK_PROVIDER: "network_or_provider_error",
+  UNKNOWN: "unknown_manual_fallback"
+};
+
 function json(res, status, body) {
   res.status(status).setHeader("Content-Type", "application/json");
   res.end(JSON.stringify(body));
 }
 
-function text(res, status, message) {
-  res.status(status).setHeader("Content-Type", "text/plain; charset=utf-8");
-  res.end(message);
+function detectPlatformFromUrl(url) {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    if (host.includes("webex.com")) {
+      return "webex";
+    }
+    if (host.includes("zoom.us") || host.includes("zoom.com")) {
+      return "zoom";
+    }
+    if (host.includes("teams.microsoft.com") || host.includes("sharepoint.com") || host.includes("onedrive.com")) {
+      return "microsoft_teams";
+    }
+    if (host.includes("meet.google.com") || host.includes("drive.google.com") || host.includes("docs.google.com")) {
+      return "google_meet";
+    }
+    return "other";
+  } catch {
+    return "other";
+  }
 }
 
-function manual(reason, details) {
-  return { status: "manual_upload_required", reason, details };
+function normalizePlatformLabel(value) {
+  const platform = String(value || "").trim().toLowerCase();
+  if (platform === "webex") {
+    return "webex";
+  }
+  if (platform === "zoom") {
+    return "zoom";
+  }
+  if (platform === "microsoft teams" || platform === "teams") {
+    return "microsoft_teams";
+  }
+  if (platform === "google meet" || platform === "meet") {
+    return "google_meet";
+  }
+  return "other";
+}
+
+function resolveProvider(platform, url) {
+  const userChosen = normalizePlatformLabel(platform);
+  if (userChosen !== "other") {
+    return userChosen;
+  }
+  return detectPlatformFromUrl(url);
 }
 
 function isProbablyTranscriptResource(url, contentType) {
@@ -31,164 +81,202 @@ function isProbablyTranscriptResource(url, contentType) {
   );
 }
 
-function detectHtmlGateReason(html, passcodeProvided) {
-  const content = html.toLowerCase();
+function getAdapterName(provider) {
+  return `${provider}_link_adapter`;
+}
 
-  if (content.includes("recording password") || content.includes("enter the recording password")) {
-    return manual(
-      "passcode_entry_required",
-      "Provider requires passcode entry inside hosted page. Download transcript or recording manually and upload to NuancePad."
-    );
+function buildDiagnostics(provider, attemptedAt, overrides = {}) {
+  return {
+    detectedPlatform: provider,
+    adapter: getAdapterName(provider),
+    attemptedAt,
+    ...overrides
+  };
+}
+
+function manual(provider, attemptedAt, reasonCode, message, diagnostics = {}) {
+  return {
+    status: "manual_upload_required",
+    reasonCode,
+    message,
+    detectedPlatform: provider,
+    diagnostics: buildDiagnostics(provider, attemptedAt, diagnostics)
+  };
+}
+
+function failed(provider, attemptedAt, reasonCode, message, diagnostics = {}) {
+  return {
+    status: "failed",
+    reasonCode,
+    message,
+    detectedPlatform: provider,
+    diagnostics: buildDiagnostics(provider, attemptedAt, diagnostics)
+  };
+}
+
+function completed(provider, attemptedAt, transcript, diagnostics = {}) {
+  return {
+    status: "completed",
+    transcript,
+    source: "direct_transcript_link",
+    detectedPlatform: provider,
+    diagnostics: buildDiagnostics(provider, attemptedAt, {
+      ...diagnostics,
+      completedAt: new Date().toISOString()
+    })
+  };
+}
+
+function manualGuidance() {
+  return "Open the link in your browser, complete access with your authorized account, download/export transcript or recording, then upload it in NuancePad.";
+}
+
+async function runWebexAdapter(recordingUrl, passcodeProvided, attemptedAt) {
+  try {
+    const response = await fetch(recordingUrl, { method: "GET", redirect: "follow" });
+    const httpStatus = response.status;
+    const responseContentType = String(response.headers.get("content-type") || "");
+    const resolvedUrlHost = (() => {
+      try {
+        return new URL(response.url || recordingUrl).hostname;
+      } catch {
+        return "";
+      }
+    })();
+
+    if (httpStatus === 401 || httpStatus === 403) {
+      return manual("webex", attemptedAt, REASONS.TENANT_POLICY, manualGuidance(), {
+        httpStatus,
+        responseContentType,
+        resolvedUrlHost
+      });
+    }
+
+    if (!response.ok) {
+      return failed("webex", attemptedAt, REASONS.NETWORK_PROVIDER, "Provider returned an unexpected response. Please retry or upload manually.", {
+        httpStatus,
+        responseContentType,
+        resolvedUrlHost
+      });
+    }
+
+    if (isProbablyTranscriptResource(recordingUrl, responseContentType)) {
+      const transcript = await response.text();
+      if (!transcript.trim()) {
+        return manual("webex", attemptedAt, REASONS.NO_TRANSCRIPT, manualGuidance(), {
+          httpStatus,
+          responseContentType,
+          resolvedUrlHost
+        });
+      }
+      if (transcript.length > MAX_TEXT_SIZE) {
+        return manual("webex", attemptedAt, REASONS.NO_TRANSCRIPT, "Transcript was too large for direct import. Download and upload transcript file manually.", {
+          httpStatus,
+          responseContentType,
+          resolvedUrlHost
+        });
+      }
+      return completed("webex", attemptedAt, transcript, { httpStatus, responseContentType, resolvedUrlHost });
+    }
+
+    if (responseContentType.toLowerCase().includes("text/html")) {
+      const html = (await response.text()).toLowerCase();
+      if (html.includes("captcha")) {
+        return manual("webex", attemptedAt, REASONS.CAPTCHA, manualGuidance(), { httpStatus, responseContentType, resolvedUrlHost });
+      }
+      if (html.includes("disabled download") || html.includes("drm")) {
+        return manual("webex", attemptedAt, REASONS.DOWNLOAD_DISABLED, manualGuidance(), {
+          httpStatus,
+          responseContentType,
+          resolvedUrlHost
+        });
+      }
+      if (html.includes("sign in") || html.includes("single sign-on") || html.includes("sso")) {
+        return manual("webex", attemptedAt, REASONS.SSO, manualGuidance(), { httpStatus, responseContentType, resolvedUrlHost });
+      }
+      if (html.includes("recording password") || html.includes("enter the recording password") || passcodeProvided) {
+        return manual("webex", attemptedAt, REASONS.INTERACTIVE, manualGuidance(), { httpStatus, responseContentType, resolvedUrlHost });
+      }
+      return manual("webex", attemptedAt, REASONS.NO_TRANSCRIPT, manualGuidance(), {
+        httpStatus,
+        responseContentType,
+        resolvedUrlHost
+      });
+    }
+
+    return manual("webex", attemptedAt, REASONS.NO_TRANSCRIPT, manualGuidance(), {
+      httpStatus,
+      responseContentType,
+      resolvedUrlHost
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unexpected provider error.";
+    return failed("webex", attemptedAt, REASONS.NETWORK_PROVIDER, "Could not reach Webex link reliably. Retry or upload manually.", {
+      message
+    });
   }
+}
 
-  if (passcodeProvided) {
-    return manual(
-      "interactive_passcode_or_session_required",
-      "Passcode was provided, but the provider still requires interactive browser flow. Open the recording in Webex, then download transcript/recording and upload manually."
-    );
-  }
-
-  if (content.includes("sign in") || content.includes("single sign-on") || content.includes("sso")) {
-    return manual(
-      "sso_or_login_required",
-      "Provider requires sign-in/SSO. Download transcript or recording with authorized account, then upload manually."
-    );
-  }
-
-  if (content.includes("captcha")) {
-    return manual(
-      "captcha_required",
-      "Provider requires CAPTCHA verification. Complete access manually, then upload transcript or recording."
-    );
-  }
-
-  if (content.includes("download") || content.includes("playback")) {
-    return manual(
-      "download_step_required",
-      "Recording page is accessible but transcript is not directly downloadable by API. Download manually and upload."
-    );
-  }
-
+async function runGenericManualAdapter(provider, attemptedAt) {
+  const providerLabel = provider === "microsoft_teams" ? "Microsoft Teams" : provider === "google_meet" ? "Google Meet" : provider === "zoom" ? "Zoom" : "This provider";
   return manual(
-    "manual_upload_required",
-    "NuancePad could not obtain a direct transcript file from this link without bypassing controls. Upload transcript or recording manually."
+    provider,
+    attemptedAt,
+    REASONS.UNSUPPORTED,
+    `${providerLabel} direct link import is not enabled for automatic transcript extraction in this Milestone. ${manualGuidance()}`
   );
 }
 
 export default async function handler(req, res) {
-  try {
-    if (req.method !== "POST") {
-      text(res, 405, "Method not allowed");
-      return;
-    }
-
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body ?? {};
-    const platform = String(body?.platform || "").trim();
-    const recordingUrl = String(body?.recordingUrl || "").trim();
-    const passcode = String(body?.passcode || "").trim();
-
-    if (!recordingUrl) {
-      text(res, 400, "Recording URL is required.");
-      return;
-    }
-
-    let parsedUrl;
-    try {
-      parsedUrl = new URL(recordingUrl);
-    } catch {
-      text(res, 400, "Recording URL is invalid.");
-      return;
-    }
-
-    if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-      text(res, 400, "Only http/https links are supported.");
-      return;
-    }
-
-    if (platform && platform.toLowerCase() !== "webex") {
-      json(
-        res,
-        200,
-        manual(
-          "platform_not_supported_for_link_import",
-          "Link import MVP currently supports Webex links. For other platforms, upload transcript or recording manually."
-        )
-      );
-      return;
-    }
-
-    // We only attempt direct retrieval using provided URL.
-    // We do not automate page interaction, SSO, CAPTCHA, or any bypass mechanism.
-    // Passcode is collected for audit/context only in this MVP and not forwarded to third parties.
-    void passcode;
-    const response = await fetch(recordingUrl, {
-      method: "GET",
-      redirect: "follow"
+  if (req.method !== "POST") {
+    json(res, 405, {
+      status: "failed",
+      reasonCode: REASONS.NETWORK_PROVIDER,
+      message: "Method not allowed.",
+      detectedPlatform: "other",
+      diagnostics: buildDiagnostics("other", new Date().toISOString(), { message: "Invalid HTTP method" })
     });
-
-    if (response.status === 401 || response.status === 403) {
-      json(
-        res,
-        200,
-        manual(
-          "access_denied",
-          "Access denied by provider controls. Use authorized account to download transcript/recording and upload manually."
-        )
-      );
-      return;
-    }
-
-    if (!response.ok) {
-      json(
-        res,
-        200,
-        manual("link_unreachable", `Provider returned status ${response.status}. Use manual upload fallback.`)
-      );
-      return;
-    }
-
-    const contentType = response.headers.get("content-type") || "";
-
-    if (isProbablyTranscriptResource(recordingUrl, contentType)) {
-      const transcript = await response.text();
-      if (!transcript.trim()) {
-        json(
-          res,
-          200,
-          manual("empty_transcript_content", "Direct transcript link returned no usable text. Upload transcript manually.")
-        );
-        return;
-      }
-
-      if (transcript.length > MAX_TEXT_SIZE) {
-        json(
-          res,
-          200,
-          manual("transcript_too_large", "Transcript file is too large for direct link import. Upload transcript file manually.")
-        );
-        return;
-      }
-
-      json(res, 200, { status: "success", transcript, source: "direct_transcript_link" });
-      return;
-    }
-
-    if (String(contentType).toLowerCase().includes("text/html")) {
-      const html = await response.text();
-      json(res, 200, detectHtmlGateReason(html, Boolean(passcode)));
-      return;
-    }
-
-    json(
-      res,
-      200,
-      manual(
-        "direct_file_not_transcript",
-        "Link resolved to non-transcript content. Upload transcript or recording file manually."
-      )
-    );
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unexpected server error.";
-    text(res, 500, `Backend error: ${message}`);
+    return;
   }
+
+  let body = {};
+  try {
+    body = typeof req.body === "string" ? JSON.parse(req.body) : req.body ?? {};
+  } catch {
+    const attemptedAt = new Date().toISOString();
+    json(res, 200, failed("other", attemptedAt, REASONS.MALFORMED, "Request payload is invalid."));
+    return;
+  }
+
+  const recordingUrl = String(body?.recordingUrl || "").trim();
+  const passcode = String(body?.passcode || "").trim();
+  const provider = resolveProvider(body?.platform, recordingUrl);
+  const attemptedAt = new Date().toISOString();
+
+  if (!recordingUrl) {
+    json(res, 200, failed(provider, attemptedAt, REASONS.MALFORMED, "Please provide a valid meeting or recording link."));
+    return;
+  }
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(recordingUrl);
+  } catch {
+    json(res, 200, failed(provider, attemptedAt, REASONS.MALFORMED, "Please provide a valid meeting or recording link."));
+    return;
+  }
+
+  if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+    json(res, 200, failed(provider, attemptedAt, REASONS.MALFORMED, "Only secure http/https links are supported."));
+    return;
+  }
+
+  if (provider === "webex") {
+    const result = await runWebexAdapter(recordingUrl, Boolean(passcode), attemptedAt);
+    json(res, 200, result);
+    return;
+  }
+
+  const result = await runGenericManualAdapter(provider, attemptedAt);
+  json(res, 200, result);
 }
