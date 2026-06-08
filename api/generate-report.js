@@ -1,7 +1,10 @@
-const DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
-const FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || "";
-const MAX_RETRIES = 3;
-const RETRYABLE_STATUS = new Set([429, 500, 503, 504]);
+const AI_PROVIDER_ORDER = process.env.AI_PROVIDER_ORDER || "deepseek,openai";
+const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-v4-flash";
+const DEEPSEEK_FALLBACK_MODEL = process.env.DEEPSEEK_FALLBACK_MODEL || "deepseek-v4-pro";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const OPENAI_FALLBACK_MODEL = process.env.OPENAI_FALLBACK_MODEL || "gpt-4.1-mini";
+const MAX_RETRIES = 2;
+const RETRYABLE_STATUS = new Set([408, 409, 429, 500, 502, 503, 504]);
 
 function json(res, status, body) {
   res.status(status).setHeader("Content-Type", "application/json");
@@ -20,10 +23,20 @@ function stripCodeFences(value) {
     .trim();
 }
 
-function normalizeUsage(usage) {
-  const promptTokens = Number(usage?.promptTokenCount || 0);
-  const outputTokens = Number(usage?.candidatesTokenCount || 0);
-  const totalTokens = Number(usage?.totalTokenCount || promptTokens + outputTokens);
+function parseProviderOrder() {
+  return AI_PROVIDER_ORDER.split(",")
+    .map((provider) => provider.trim().toLowerCase())
+    .filter((provider, index, providers) => provider && providers.indexOf(provider) === index);
+}
+
+function tokenEstimate(value) {
+  return Math.max(1, Math.ceil(String(value || "").length / 4));
+}
+
+function normalizeOpenAICompatibleUsage(usage, prompt, output) {
+  const promptTokens = Number(usage?.prompt_tokens || tokenEstimate(prompt));
+  const outputTokens = Number(usage?.completion_tokens || tokenEstimate(output));
+  const totalTokens = Number(usage?.total_tokens || promptTokens + outputTokens);
   return { promptTokens, outputTokens, totalTokens };
 }
 
@@ -82,35 +95,153 @@ ${transcript}
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function callGeminiWithRetry({ model, apiKey, body }) {
-  let lastStatus = 0;
+function classifyFailure({ provider, model, status, body, message }) {
+  const raw = `${body || ""} ${message || ""}`.toLowerCase();
+  let reason = "provider error";
+
+  if (status === 401 || status === 403 || raw.includes("api key")) {
+    reason = "missing or invalid provider key";
+  } else if (status === 402 || raw.includes("quota") || raw.includes("resource_exhausted") || raw.includes("insufficient")) {
+    reason = "quota exhausted";
+  } else if (status === 429 || raw.includes("rate limit") || raw.includes("too many requests")) {
+    reason = "rate limited";
+  } else if (raw.includes("invalid json")) {
+    reason = "invalid JSON";
+  } else if (status === 0) {
+    reason = "network error";
+  }
+
+  return {
+    provider,
+    model,
+    status: status || "unknown",
+    reason,
+    detail: String(body || message || "").slice(0, 500)
+  };
+}
+
+async function fetchWithRetry(url, options) {
+  let lastResponse = null;
   let lastBody = "";
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body
+    try {
+      const response = await fetch(url, options);
+      if (response.ok) {
+        return { ok: true, payload: await response.json() };
       }
-    );
 
-    if (response.ok) {
-      return { ok: true, model, payload: await response.json() };
+      lastResponse = response;
+      lastBody = await response.text();
+
+      if (!RETRYABLE_STATUS.has(response.status) || attempt === MAX_RETRIES) {
+        break;
+      }
+    } catch (error) {
+      lastResponse = { status: 0 };
+      lastBody = error instanceof Error ? error.message : "Network error";
+
+      if (attempt === MAX_RETRIES) {
+        break;
+      }
     }
 
-    lastStatus = response.status;
-    lastBody = await response.text();
-
-    if (!RETRYABLE_STATUS.has(response.status) || attempt === MAX_RETRIES) {
-      break;
-    }
-
-    await sleep(500 * 2 ** (attempt - 1));
+    await sleep(300 * 2 ** (attempt - 1));
   }
 
-  return { ok: false, model, status: lastStatus, body: lastBody };
+  return {
+    ok: false,
+    status: lastResponse?.status || 0,
+    body: lastBody
+  };
+}
+
+async function callDeepSeek({ model, apiKey, prompt }) {
+  const result = await fetchWithRetry("https://api.deepseek.com/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2,
+      response_format: { type: "json_object" }
+    })
+  });
+
+  if (!result.ok) {
+    return { ok: false, ...classifyFailure({ provider: "deepseek", model, status: result.status, body: result.body }) };
+  }
+
+  const content = result.payload?.choices?.[0]?.message?.content;
+  if (!content) {
+    return {
+      ok: false,
+      ...classifyFailure({ provider: "deepseek", model, status: 502, message: "Provider returned empty content." })
+    };
+  }
+
+  return {
+    ok: true,
+    provider: "deepseek",
+    model,
+    content,
+    usage: normalizeOpenAICompatibleUsage(result.payload?.usage, prompt, content)
+  };
+}
+
+async function callOpenAI({ model, apiKey, prompt }) {
+  const result = await fetchWithRetry("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2,
+      response_format: { type: "json_object" }
+    })
+  });
+
+  if (!result.ok) {
+    return { ok: false, ...classifyFailure({ provider: "openai", model, status: result.status, body: result.body }) };
+  }
+
+  const content = result.payload?.choices?.[0]?.message?.content;
+  if (!content) {
+    return {
+      ok: false,
+      ...classifyFailure({ provider: "openai", model, status: 502, message: "Provider returned empty content." })
+    };
+  }
+
+  return {
+    ok: true,
+    provider: "openai",
+    model,
+    content,
+    usage: normalizeOpenAICompatibleUsage(result.payload?.usage, prompt, content)
+  };
+}
+
+function providerAttempts(provider) {
+  if (provider === "deepseek") {
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+    const models = [DEEPSEEK_MODEL, DEEPSEEK_FALLBACK_MODEL].filter(Boolean);
+    return { apiKey, missingKey: "DEEPSEEK_API_KEY", models, caller: callDeepSeek };
+  }
+
+  if (provider === "openai") {
+    const apiKey = process.env.OPENAI_API_KEY;
+    const models = [OPENAI_MODEL, OPENAI_FALLBACK_MODEL].filter(Boolean);
+    return { apiKey, missingKey: "OPENAI_API_KEY", models, caller: callOpenAI };
+  }
+
+  return null;
 }
 
 export default async function handler(req, res) {
@@ -120,16 +251,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      text(res, 500, "AI provider not configured.");
-      return;
-    }
-
-    const body =
-      typeof req.body === "string"
-        ? JSON.parse(req.body)
-        : req.body ?? {};
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body ?? {};
     const transcript = body?.transcript;
     const metadata = body?.metadata;
 
@@ -138,49 +260,81 @@ export default async function handler(req, res) {
       return;
     }
 
-    const requestBody = JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: buildPrompt(transcript, metadata) }] }],
-      generationConfig: { responseMimeType: "application/json", temperature: 0.2 }
-    });
+    const prompt = buildPrompt(transcript, metadata);
+    const failures = [];
+    const skipped = [];
+    const providers = parseProviderOrder();
 
-    const modelsToTry = [DEFAULT_MODEL, FALLBACK_MODEL].filter(Boolean);
-    let winner = null;
-    let lastFailure = null;
-
-    for (const model of modelsToTry) {
-      const result = await callGeminiWithRetry({ model, apiKey, body: requestBody });
-      if (result.ok) {
-        winner = result;
-        break;
+    for (const provider of providers) {
+      const config = providerAttempts(provider);
+      if (!config) {
+        failures.push({
+          provider,
+          model: "",
+          status: "skipped",
+          reason: "unsupported provider",
+          detail: `Unsupported AI provider '${provider}' in AI_PROVIDER_ORDER.`
+        });
+        continue;
       }
-      lastFailure = result;
+
+      if (!config.apiKey) {
+        skipped.push(`${provider} (${config.missingKey})`);
+        failures.push({
+          provider,
+          model: config.models[0] || "",
+          status: "skipped",
+          reason: "missing provider key",
+          detail: `${config.missingKey} is not configured.`
+        });
+        continue;
+      }
+
+      for (const model of config.models) {
+        const attempt = await config.caller({ model, apiKey: config.apiKey, prompt });
+
+        if (!attempt.ok) {
+          failures.push(attempt);
+          continue;
+        }
+
+        try {
+          json(res, 200, {
+            report: JSON.parse(stripCodeFences(attempt.content)),
+            usage: {
+              provider: attempt.provider,
+              model: attempt.model,
+              ...attempt.usage
+            }
+          });
+          return;
+        } catch {
+          failures.push({
+            provider: attempt.provider,
+            model: attempt.model,
+            status: "invalid_json",
+            reason: "invalid JSON",
+            detail: "AI provider returned content that was not valid JSON."
+          });
+        }
+      }
     }
 
-    if (!winner) {
-      const upstream = lastFailure?.body ? String(lastFailure.body).slice(0, 500) : "Unknown upstream failure.";
-      text(
-        res,
-        502,
-        `Failed to generate meeting report. Model tried: ${lastFailure?.model || DEFAULT_MODEL}. Status: ${lastFailure?.status || "unknown"}. Upstream: ${upstream}`
-      );
+    if (failures.length === skipped.length && skipped.length > 0) {
+      text(res, 500, `AI provider not configured. Missing provider key(s): ${skipped.join(", ")}.`);
       return;
     }
 
-    const textResult = winner.payload?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const lastFailure = failures[failures.length - 1];
+    const summary = failures
+      .map((failure) => `${failure.provider}${failure.model ? `/${failure.model}` : ""}: ${failure.reason}`)
+      .join("; ");
 
-    if (!textResult) {
-      text(res, 502, `AI provider returned empty content (model: ${winner.model}).`);
-      return;
-    }
-
-    try {
-      json(res, 200, {
-        report: JSON.parse(stripCodeFences(textResult)),
-        usage: normalizeUsage(winner.payload?.usageMetadata)
-      });
-    } catch {
-      text(res, 502, "AI provider returned invalid JSON.");
-    }
+    text(
+      res,
+      502,
+      `All configured AI providers failed. Check DeepSeek/OpenAI API keys, credits, or model configuration. Last failure: ${lastFailure?.reason || "unknown"}. Attempts: ${summary || "none"}.`
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected server error.";
     text(res, 500, `Backend error: ${message}`);

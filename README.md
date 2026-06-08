@@ -126,9 +126,13 @@ VITE_FIREBASE_PROJECT_ID=
 VITE_FIREBASE_STORAGE_BUCKET=
 VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=
-GEMINI_API_KEY=
-GEMINI_MODEL=gemini-flash-latest
-GEMINI_FALLBACK_MODEL=gemini-2.0-flash
+AI_PROVIDER_ORDER=deepseek,openai
+DEEPSEEK_API_KEY=
+DEEPSEEK_MODEL=deepseek-v4-flash
+DEEPSEEK_FALLBACK_MODEL=deepseek-v4-pro
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_FALLBACK_MODEL=gpt-4.1-mini
 RESEND_API_KEY=
 EMAIL_FROM=
 EMAIL_PROVIDER=gmail
@@ -141,7 +145,10 @@ GOOGLE_ACCESS_TOKEN=
 ```
 
 If Firebase vars are missing, app runs in local-storage mode.
-If backend Gemini key is missing, report generation/transcription return `AI provider not configured.`
+If DeepSeek vars are missing, MoM generation skips DeepSeek and tries OpenAI.
+If all report-generation provider keys are missing, report generation returns `AI provider not configured.`
+Gemini is no longer used for MoM generation and old Gemini report env vars are ignored.
+Recording transcription is a separate endpoint and is unchanged by this provider-router update.
 
 ## Full-stack runtime (frontend + backend)
 
@@ -150,6 +157,16 @@ NuancePad now uses backend API routes for AI operations:
 - `POST /api/generate-report`
 - `POST /api/transcribe-recording`
 - `POST /api/send-meeting-email`
+
+MoM generation provider routing:
+
+1. `AI_PROVIDER_ORDER=deepseek,openai` tries DeepSeek first and OpenAI second.
+2. DeepSeek primary model: `deepseek-v4-flash`.
+3. DeepSeek fallback model: `deepseek-v4-pro`.
+4. Deprecated DeepSeek model names `deepseek-chat` and `deepseek-reasoner` are not used.
+5. OpenAI primary fallback model: `gpt-4o-mini`.
+6. OpenAI secondary fallback model: `gpt-4.1-mini`.
+7. Gemini env vars are ignored for MoM generation even if they still exist in Vercel.
 
 Email provider options:
 
@@ -166,9 +183,13 @@ Email provider options:
 Set backend env vars in Vercel:
 
 ```bash
-GEMINI_API_KEY=
-GEMINI_MODEL=gemini-flash-latest
-GEMINI_FALLBACK_MODEL=gemini-2.0-flash
+AI_PROVIDER_ORDER=deepseek,openai
+DEEPSEEK_API_KEY=
+DEEPSEEK_MODEL=deepseek-v4-flash
+DEEPSEEK_FALLBACK_MODEL=deepseek-v4-pro
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_FALLBACK_MODEL=gpt-4.1-mini
 RESEND_API_KEY=
 EMAIL_FROM=
 EMAIL_PROVIDER=gmail

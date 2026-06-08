@@ -115,6 +115,8 @@ export interface MeetingMetadata {
 }
 
 export interface UsageMetrics {
+  provider?: string;
+  model?: string;
   promptTokens: number;
   outputTokens: number;
   totalTokens: number;

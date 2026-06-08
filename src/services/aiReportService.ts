@@ -3,7 +3,7 @@ import { normalizeMeetingReport } from "../utils/meetingSchema";
 
 export interface ReportGenerationResult {
   report: MeetingReport;
-  usage: Pick<UsageMetrics, "promptTokens" | "outputTokens" | "totalTokens">;
+  usage: Pick<UsageMetrics, "provider" | "model" | "promptTokens" | "outputTokens" | "totalTokens">;
 }
 
 export const aiReportService = {
@@ -28,6 +28,8 @@ export const aiReportService = {
     return {
       report: normalizeMeetingReport({ ...reportPayload, title: reportPayload.title || metadata.title }),
       usage: {
+        provider: typeof usagePayload.provider === "string" ? usagePayload.provider : undefined,
+        model: typeof usagePayload.model === "string" ? usagePayload.model : undefined,
         promptTokens: Number(usagePayload.promptTokens || 0),
         outputTokens: Number(usagePayload.outputTokens || 0),
         totalTokens: Number(usagePayload.totalTokens || 0)

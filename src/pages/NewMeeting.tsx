@@ -145,6 +145,8 @@ export function NewMeeting() {
       const generated = await aiReportService.generateMeetingReport(workingTranscript, { ...metadata, sourceType });
       setReport(generated.report);
       setUsageMetrics({
+        provider: generated.usage.provider,
+        model: generated.usage.model,
         promptTokens: generated.usage.promptTokens,
         outputTokens: generated.usage.outputTokens,
         totalTokens: generated.usage.totalTokens + transcriptionTokens,

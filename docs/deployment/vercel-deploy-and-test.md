@@ -20,7 +20,9 @@ This deployment is full-stack in one Vercel project:
 2. GitHub repo with this project.
 3. Vercel account connected to GitHub.
 4. Firebase credentials (optional; without them app uses local-storage mode).
-5. Gemini API key (required for backend AI endpoints).
+5. DeepSeek API key for lower-cost MoM generation (primary).
+6. OpenAI API key for fallback MoM generation.
+7. Gemini API key only if you use the existing recording transcription endpoint.
 
 ## 3. Local Verification (Frontend Build)
 
@@ -81,9 +83,13 @@ VITE_FIREBASE_APP_ID=
 ### Backend variables (server-side only)
 
 ```bash
-GEMINI_API_KEY=
-GEMINI_MODEL=gemini-flash-latest
-GEMINI_FALLBACK_MODEL=gemini-2.0-flash
+AI_PROVIDER_ORDER=deepseek,openai
+DEEPSEEK_API_KEY=
+DEEPSEEK_MODEL=deepseek-v4-flash
+DEEPSEEK_FALLBACK_MODEL=deepseek-v4-pro
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_FALLBACK_MODEL=gpt-4.1-mini
 RESEND_API_KEY=
 EMAIL_FROM=
 EMAIL_PROVIDER=gmail
@@ -103,13 +109,17 @@ Apply to:
 Important:
 
 1. Do not use `VITE_` prefix for backend secrets.
-2. `GEMINI_API_KEY` must remain server-side only.
-3. `GEMINI_FALLBACK_MODEL` is optional but recommended to reduce outage impact during model saturation.
-4. For Gmail provider, `GMAIL_APP_PASSWORD` must be a Google App Password generated after enabling 2-Step Verification.
-5. For Resend provider, `EMAIL_FROM` must be a sender verified by your Resend account/domain.
-6. `ZOOM_OAUTH_ACCESS_TOKEN` enables Zoom cloud recording/transcript API retrieval when permitted.
-7. `MS_GRAPH_ACCESS_TOKEN` enables Teams/SharePoint/OneDrive Graph artifact retrieval when tenant permissions allow.
-8. `GOOGLE_ACCESS_TOKEN` enables Google Meet/Drive artifact retrieval when permissions allow.
+2. `DEEPSEEK_API_KEY` and `OPENAI_API_KEY` must remain server-side only.
+3. `AI_PROVIDER_ORDER=deepseek,openai` makes DeepSeek primary for MoM generation and OpenAI fallback.
+4. Use `DEEPSEEK_MODEL=deepseek-v4-flash` and `DEEPSEEK_FALLBACK_MODEL=deepseek-v4-pro`.
+5. Do not use deprecated DeepSeek model names `deepseek-chat` or `deepseek-reasoner`.
+6. Use `OPENAI_MODEL=gpt-4o-mini` and `OPENAI_FALLBACK_MODEL=gpt-4.1-mini`.
+7. Gemini env vars are ignored for MoM generation if old values still exist in Vercel.
+8. For Gmail provider, `GMAIL_APP_PASSWORD` must be a Google App Password generated after enabling 2-Step Verification.
+9. For Resend provider, `EMAIL_FROM` must be a sender verified by your Resend account/domain.
+10. `ZOOM_OAUTH_ACCESS_TOKEN` enables Zoom cloud recording/transcript API retrieval when permitted.
+11. `MS_GRAPH_ACCESS_TOKEN` enables Teams/SharePoint/OneDrive Graph artifact retrieval when tenant permissions allow.
+12. `GOOGLE_ACCESS_TOKEN` enables Google Meet/Drive artifact retrieval when permissions allow.
 
 ## 8. Deploy
 
@@ -132,9 +142,11 @@ Important:
 2. Paste transcript
 3. Click `Generate MoM`
 4. Verify tabular sections (decisions/actions/risks/concerns/additional)
-5. Click `Save meeting`
-6. Verify `/meetings` shows saved item
-7. Verify detail page + export actions
+5. Verify generation succeeds through DeepSeek when `DEEPSEEK_API_KEY` is configured.
+6. If DeepSeek is unavailable, verify OpenAI fallback works when `OPENAI_API_KEY` is configured.
+7. Click `Save meeting`
+8. Verify `/meetings` shows saved item
+9. Verify detail page + export actions
 
 ### C. Recording Flow (Milestone B)
 
@@ -206,12 +218,13 @@ Important:
 ## 10. Negative Tests
 
 1. Upload unsupported file (e.g. `.mov`) -> validation error expected
-2. Remove `GEMINI_API_KEY` in Preview env and redeploy -> `AI provider not configured.` expected
-3. Remove Firebase vars -> app still functions using local-storage mode
-4. Use a protected link requiring interactive sign-in/passcode page -> `manual_upload_required` expected
-5. Use malformed link -> `failed` with `malformed_link`
-6. Remove `RESEND_API_KEY` and click `Send follow-up email` -> `Email provider not configured` expected
-7. With provider tokens removed, Zoom/Teams/Google link imports should fail safely with `oauth_or_scope_missing`.
+2. Remove `DEEPSEEK_API_KEY` but keep `OPENAI_API_KEY` -> MoM generation should fall back to OpenAI
+3. Remove both `DEEPSEEK_API_KEY` and `OPENAI_API_KEY` in Preview env and redeploy -> `AI provider not configured.` expected
+4. Remove Firebase vars -> app still functions using local-storage mode
+5. Use a protected link requiring interactive sign-in/passcode page -> `manual_upload_required` expected
+6. Use malformed link -> `failed` with `malformed_link`
+7. Remove `RESEND_API_KEY` and click `Send follow-up email` -> `Email provider not configured` expected
+8. With provider tokens removed, Zoom/Teams/Google link imports should fail safely with `oauth_or_scope_missing`.
 
 ## 11. Go / No-Go Checklist
 
